@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Camera Slider</title>
+<style>
+  :root{
+    --bg:#0e1014; --card:#171a21; --line:#252a35; --text:#e7ecf3;
+    --muted:#8a93a6; --accent:#4ea1ff; --accent2:#2b6cb0;
+    --ok:#3ddc97; --warn:#ffb84d; --bad:#ff5d6c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;touch-action:manipulation}
+  header{padding:14px 16px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(180deg,#13171f,#0e1014)}
+  header h1{margin:0;font-size:16px;font-weight:600;letter-spacing:.3px}
+  .badge{font-size:12px;padding:4px 10px;border-radius:999px;background:#222836;color:var(--muted)}
+  .badge.ok{background:#0e3826;color:var(--ok)}
+  .badge.warn{background:#3a2c10;color:var(--warn)}
+  .badge.bad{background:#3a1418;color:var(--bad)}
+  .status{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+  .row{display:flex;justify-content:space-between;align-items:center;margin:4px 0}
+  .row .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  .row .val{font-variant-numeric:tabular-nums;font-weight:600}
+  .progress{height:6px;background:#222836;border-radius:6px;overflow:hidden;margin-top:8px}
+  .progress > div{height:100%;background:linear-gradient(90deg,var(--accent),#7ec4ff);width:0%;transition:width .15s linear}
+  nav{display:flex;border-bottom:1px solid var(--line);background:#10131a}
+  nav button{flex:1;background:none;border:0;color:var(--muted);padding:14px 0;font:inherit;
+    border-bottom:2px solid transparent;cursor:pointer}
+  nav button.active{color:var(--text);border-bottom-color:var(--accent)}
+  main{padding:16px;max-width:520px;margin:0 auto}
+  section{display:none}
+  section.active{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+  .card h2{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+  .jog{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .jog button{padding:28px 0;font-size:18px;font-weight:600;border-radius:10px;border:1px solid var(--line);
+    background:#1d2230;color:var(--text);cursor:pointer;touch-action:manipulation}
+  .jog button:active{background:var(--accent2)}
+  .btn{display:block;width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);
+    background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer;margin-top:8px}
+  .btn.secondary{background:#1d2230;color:var(--text)}
+  .btn.danger{background:var(--bad)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .field{display:flex;justify-content:space-between;align-items:center;margin:10px 0}
+  .field label{color:var(--muted);font-size:13px}
+  .field input,.field select{background:#0f1218;border:1px solid var(--line);color:var(--text);
+    padding:8px 10px;border-radius:8px;font:inherit;width:140px;text-align:right}
+  .field input[type=checkbox]{width:auto}
+  .seg{display:flex;background:#0f1218;border:1px solid var(--line);border-radius:10px;padding:3px;margin:8px 0}
+  .seg button{flex:1;background:none;border:0;color:var(--muted);padding:10px 0;border-radius:8px;font:inherit;cursor:pointer}
+  .seg button.on{background:var(--accent2);color:#fff}
+  .lock-overlay{position:fixed;inset:0;background:rgba(8,10,14,.85);backdrop-filter:blur(4px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:50}
+  .lock-overlay.hidden{display:none}
+  .lock-overlay h2{margin:0 0 8px;font-size:18px}
+  .lock-overlay p{margin:0 0 18px;color:var(--muted);text-align:center;max-width:300px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Camera Slider</h1>
+  <span id="connBadge" class="badge">connecting</span>
+</header>
+
+<div class="status">
+  <div class="row"><span class="label">Status</span><span id="statText" class="val">—</span></div>
+  <div class="row"><span class="label">Position</span><span class="val"><span id="posVal">0.0</span> mm</span></div>
+  <div class="progress"><div id="progBar"></div></div>
+</div>
+
+<nav>
+  <button data-tab="manual" class="active">Manual</button>
+  <button data-tab="auto">Auto</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+
+<main>
+
+  <section id="tab-manual" class="active">
+    <div class="card">
+      <h2>Jog Control</h2>
+      <div class="jog">
+        <button id="jogL">&#9664;  LEFT</button>
+        <button id="jogR">RIGHT  &#9654;</button>
+      </div>
+      <p class="hint">Press and hold a button to move. Release to stop.</p>
+    </div>
+    <div class="card">
+      <h2>Quick Actions</h2>
+      <button class="btn secondary" id="gotoHome">Go to Home (0 mm)</button>
+      <button class="btn danger" id="estop">Emergency Stop</button>
+    </div>
+  </section>
+
+  <section id="tab-auto">
+    <div class="card">
+      <h2>Direction</h2>
+      <div class="seg" id="dirSeg">
+        <button data-dir="ltr" class="on">Left &rarr; Right</button>
+        <button data-dir="rtl">Right &rarr; Left</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Duration</h2>
+      <div class="field">
+        <label>Travel time</label>
+        <input type="number" id="autoDur" min="1" max="3600" step="1" value="20">
+      </div>
+      <p class="small">seconds &mdash; full rail length, at constant speed</p>
+    </div>
+    <button class="btn" id="autoStart">Start</button>
+    <button class="btn danger" id="autoStop" style="display:none">Stop</button>
+  </section>
+
+  <section id="tab-settings">
+    <div class="card">
+      <h2>Mechanical</h2>
+      <div class="field">
+        <label>Steps per mm</label>
+        <input type="number" id="setStepsMm" min="1" max="3200" step="0.1">
+      </div>
+      <div class="field">
+        <label>Max travel (mm)</label>
+        <input type="number" id="setMaxTravel" min="10" max="2000" step="1">
+      </div>
+    </div>
+    <div class="card">
+      <h2>Motion Profile</h2>
+      <div class="field">
+        <label>Max speed (mm/s)</label>
+        <input type="number" id="setMaxSpeed" min="1" max="500" step="0.5">
+      </div>
+      <div class="field">
+        <label>Acceleration (mm/s&sup2;)</label>
+        <input type="number" id="setAccel" min="1" max="5000" step="1">
+      </div>
+      <div class="field">
+        <label>Smooth ramping</label>
+        <input type="checkbox" id="setUseAccel">
+      </div>
+      <p class="small">Disable smooth ramping to run at max speed instantly (may cause step loss on heavy loads).</p>
+    </div>
+    <button class="btn" id="settingsSave">Save Settings</button>
+    <button class="btn secondary" id="settingsReload">Reload</button>
+  </section>
+
+</main>
+
+<div id="lockOverlay" class="lock-overlay">
+  <h2>Homing Required</h2>
+  <p>The slider must find its home position before any movement is allowed.</p>
+  <button class="btn" id="homeBtn" style="max-width:240px">Start Homing</button>
+  <p id="homingMsg" class="small" style="margin-top:14px"></p>
+</div>
+
+<script>
+const $ = q => document.querySelector(q);
+const $$ = q => document.querySelectorAll(q);
+
+let state = { homed:false, state:'?', pos:0, progress:0 };
+let autoDir = 'ltr';
+let pollFailures = 0;
+
+// ---- Tab switching ----
+$$('nav button').forEach(b => b.addEventListener('click', () => {
+  $$('nav button').forEach(x => x.classList.remove('active'));
+  $$('main section').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  $('#tab-' + b.dataset.tab).classList.add('active');
+}));
+
+// ---- Direction segmented ----
+$$('#dirSeg button').forEach(b => b.addEventListener('click', () => {
+  $$('#dirSeg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  autoDir = b.dataset.dir;
+}));
+
+// ---- API helpers ----
+async function api(path, opts) {
+  try {
+    const r = await fetch(path, opts);
+    if (!r.ok) throw 0;
+    return await r.json();
+  } catch(e) {
+    return null;
+  }
+}
+
+// ---- Status polling ----
+async function poll() {
+  const s = await api('/api/status');
+  if (!s) {
+    pollFailures++;
+    if (pollFailures > 3) {
+      $('#connBadge').className = 'badge bad';
+      $('#connBadge').textContent = 'offline';
+    }
+    return;
+  }
+  pollFailures = 0;
+  state = s;
+  $('#connBadge').className = 'badge ok';
+  $('#connBadge').textContent = 'connected';
+  $('#statText').textContent = s.stateText;
+  $('#posVal').textContent = s.pos.toFixed(1);
+  $('#progBar').style.width = (s.progress * 100).toFixed(1) + '%';
+
+  // Lock overlay
+  if (s.homed) {
+    $('#lockOverlay').classList.add('hidden');
+  } else {
+    $('#lockOverlay').classList.remove('hidden');
+  }
+
+  // Auto buttons swap
+  const isAuto = s.state === 'AUTO_MOVE' || s.state === 'AUTO_REPOSITION';
+  $('#autoStart').style.display = isAuto ? 'none' : 'block';
+  $('#autoStop').style.display  = isAuto ? 'block' : 'none';
+}
+setInterval(poll, 150);
+poll();
+
+// ---- Homing ----
+$('#homeBtn').addEventListener('click', async () => {
+  $('#homeBtn').disabled = true;
+  $('#homingMsg').textContent = 'Moving to limit switch...';
+  await api('/api/home', { method:'POST' });
+  let tries = 0;
+  const t = setInterval(() => {
+    if (state.homed) { clearInterval(t); $('#homeBtn').disabled = false; }
+    if (++tries > 400) {
+      clearInterval(t);
+      $('#homeBtn').disabled = false;
+      $('#homingMsg').textContent='Timed out. Check wiring.';
+    }
+  }, 250);
+});
+
+// ---- Manual jog: press & hold ----
+function bindJog(el, dir) {
+  const start = e => {
+    e.preventDefault();
+    api('/api/manual', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'start',dir})
+    });
+  };
+  const stop = e => {
+    e.preventDefault();
+    api('/api/manual', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'stop'})
+    });
+  };
+  el.addEventListener('mousedown', start);
+  el.addEventListener('touchstart', start, {passive:false});
+  el.addEventListener('mouseup', stop);
+  el.addEventListener('mouseleave', stop);
+  el.addEventListener('touchend', stop);
+  el.addEventListener('touchcancel', stop);
+}
+bindJog($('#jogL'), 'left');
+bindJog($('#jogR'), 'right');
+
+$('#estop').addEventListener('click', () => api('/api/estop', { method:'POST' }));
+$('#gotoHome').addEventListener('click', () => api('/api/goto', {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({pos:0})
+}));
+
+// ---- Auto move ----
+$('#autoStart').addEventListener('click', () => {
+  const dur = parseFloat($('#autoDur').value) || 10;
+  api('/api/auto', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'start', dir:autoDir, duration:dur})
+  });
+});
+$('#autoStop').addEventListener('click', () => {
+  api('/api/auto', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'stop'})
+  });
+});
+
+// ---- Settings ----
+async function loadSettings() {
+  const s = await api('/api/settings');
+  if (!s) return;
+  $('#setStepsMm').value    = s.stepsPerMm;
+  $('#setMaxTravel').value  = s.maxTravelMm;
+  $('#setMaxSpeed').value   = s.maxSpeedMmS;
+  $('#setAccel').value      = s.accelMmS2;
+  $('#setUseAccel').checked = s.useAccel;
+}
+$('#settingsSave').addEventListener('click', async () => {
+  const payload = {
+    stepsPerMm:   parseFloat($('#setStepsMm').value),
+    maxTravelMm:  parseFloat($('#setMaxTravel').value),
+    maxSpeedMmS:  parseFloat($('#setMaxSpeed').value),
+    accelMmS2:    parseFloat($('#setAccel').value),
+    useAccel:     $('#setUseAccel').checked
+  };
+  const r = await api('/api/settings', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  $('#settingsSave').textContent = r ? 'Saved ✓' : 'Save failed';
+  setTimeout(() => $('#settingsSave').textContent = 'Save Settings', 1500);
+});
+$('#settingsReload').addEventListener('click', loadSettings);
+loadSettings();
+</script>
+</body>
+</html>
