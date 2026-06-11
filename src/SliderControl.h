@@ -10,6 +10,8 @@ enum SliderState {
     STATE_MANUAL,           // manual jog active
     STATE_AUTO_REPOSITION,  // going to start of auto move
     STATE_AUTO_MOVE,        // executing the timed auto move
+    STATE_AUTO_PAUSED,      // auto move paused (resumable)
+    STATE_CALIBRATE,        // spinning a fixed number of steps for calibration
     STATE_FAULT
 };
 
@@ -23,15 +25,25 @@ void Slider_update();           // call frequently from loop()
 
 // ---- Commands ----
 bool Slider_startHoming();
+void Slider_skipHoming();       // skip homing: treat current position as 0, unlock movement
 void Slider_stop();             // soft stop (use after manual release)
 void Slider_emergencyStop();
 
-bool Slider_manualStart(Direction d);   // press
-void Slider_manualStop();               // release
+// Calibration: spin a fixed number of steps (signed), then return to idle
+bool Slider_calibrateSpin(long steps);
+
+bool Slider_manualStart(Direction d, float speedMmS);   // press (jog at speedMmS)
+void Slider_manualStop();                               // release
+
+// Absolute move to a millimetre position (0..maxTravel). Non-blocking; returns
+// true if accepted. Used by /api/goto (external apps + "go to home").
+bool Slider_gotoMm(float mm);
 
 // Auto move: direction = "ltr" (0 -> max) or "rtl" (max -> 0), duration in seconds
 bool Slider_startAuto(bool leftToRight, float durationSec);
 void Slider_stopAuto();
+bool Slider_pauseAuto();
+bool Slider_resumeAuto();
 
 // ---- Status getters ----
 SliderState Slider_state();

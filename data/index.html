@@ -51,6 +51,9 @@
   .field input,.field select{background:#0f1218;border:1px solid var(--line);color:var(--text);
     padding:8px 10px;border-radius:8px;font:inherit;width:140px;text-align:right}
   .field input[type=checkbox]{width:auto}
+  .slider{margin-top:14px}
+  .slider-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .slider input[type=range]{width:100%;accent-color:var(--accent);height:26px;cursor:pointer}
   .seg{display:flex;background:#0f1218;border:1px solid var(--line);border-radius:10px;padding:3px;margin:8px 0}
   .seg button{flex:1;background:none;border:0;color:var(--muted);padding:10px 0;border-radius:8px;font:inherit;cursor:pointer}
   .seg button.on{background:var(--accent2);color:#fff}
@@ -91,12 +94,21 @@
         <button id="jogL">&#9664;  LEFT</button>
         <button id="jogR">RIGHT  &#9654;</button>
       </div>
+      <div class="slider">
+        <div class="slider-head">
+          <span class="label">Jog speed</span>
+          <span class="val"><span id="jogSpeedVal">30</span> mm/s</span>
+        </div>
+        <input type="range" id="jogSpeed" min="0" max="60" step="0.5" value="30">
+      </div>
       <p class="hint">Press and hold a button to move. Release to stop.</p>
     </div>
     <div class="card">
       <h2>Quick Actions</h2>
       <button class="btn secondary" id="gotoHome">Go to Home (0 mm)</button>
+      <button class="btn secondary" id="rehome">Re-Home (recalibrate)</button>
       <button class="btn danger" id="estop">Emergency Stop</button>
+      <p class="hint">Use Re-Home if the carriage seems to have lost steps and the position display drifted.</p>
     </div>
   </section>
 
@@ -117,6 +129,8 @@
       <p class="small">seconds &mdash; full rail length, at constant speed</p>
     </div>
     <button class="btn" id="autoStart">Start</button>
+    <button class="btn secondary" id="autoPause" style="display:none">Pause</button>
+    <button class="btn" id="autoResume" style="display:none">Resume</button>
     <button class="btn danger" id="autoStop" style="display:none">Stop</button>
   </section>
 
@@ -124,13 +138,38 @@
     <div class="card">
       <h2>Mechanical</h2>
       <div class="field">
-        <label>Steps per mm</label>
-        <input type="number" id="setStepsMm" min="1" max="3200" step="0.1">
+        <label>mm per revolution</label>
+        <input type="number" id="setMmPerRev" min="0.1" max="1000" step="0.1">
       </div>
       <div class="field">
         <label>Max travel (mm)</label>
         <input type="number" id="setMaxTravel" min="10" max="2000" step="1">
       </div>
+      <div class="field">
+        <label>Flip direction</label>
+        <input type="checkbox" id="setInvertDir">
+      </div>
+      <p class="small">mm the carriage travels per full motor turn. Flip direction if LEFT/RIGHT or homing run the wrong way. Use Calibration below if mm/turn is unknown.</p>
+    </div>
+    <div class="card">
+      <h2>Calibration</h2>
+      <p class="small">Spin a known number of turns, measure how far the carriage actually moved, then apply. This sets mm/turn precisely.</p>
+      <div class="field">
+        <label>Turns to spin</label>
+        <input type="number" id="calTurns" min="0.1" max="100" step="0.1" value="2">
+      </div>
+      <button class="btn secondary" id="calSpin">&#9654; Spin</button>
+      <div class="field">
+        <label>Measured travel (mm)</label>
+        <input type="number" id="calMeasured" min="0.1" max="2000" step="0.1">
+      </div>
+      <button class="btn" id="calApply">Apply Calibration</button>
+      <p id="calMsg" class="small" style="margin-top:8px"></p>
+      <div class="field" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+        <label>Homing speed (mm/s)</label>
+        <input type="number" id="setHomingSpeed" min="1" max="500" step="0.5">
+      </div>
+      <p class="small">Speed used to drive toward the limit switch when homing. Lower = gentler &amp; more accurate stop.</p>
     </div>
     <div class="card">
       <h2>Motion Profile</h2>
@@ -149,16 +188,31 @@
       <p class="small">Disable smooth ramping to run at max speed instantly (may cause step loss on heavy loads).</p>
     </div>
     <button class="btn" id="settingsSave">Save Settings</button>
-    <button class="btn secondary" id="settingsReload">Reload</button>
+    <div class="card" style="margin-top:12px">
+      <h2>Network</h2>
+      <div class="row"><span class="label">Connected to</span><span id="wifiSsid" class="val">&mdash;</span></div>
+      <div class="row"><span class="label">IP</span><span id="wifiIp" class="val">&mdash;</span></div>
+      <button class="btn danger" id="wifiForget">Forget Network</button>
+      <p class="small">Clears the saved Wi-Fi and restarts into the CameraSlider setup AP so you can pick a new network.</p>
+      <p id="wifiMsg" class="small" style="margin-top:6px"></p>
+    </div>
   </section>
 
 </main>
 
 <div id="lockOverlay" class="lock-overlay">
-  <h2>Homing Required</h2>
-  <p>The slider must find its home position before any movement is allowed.</p>
+  <h2>Homing</h2>
+  <p>Home the slider to set an accurate reference, or skip and use the current position as 0 mm.</p>
   <button class="btn" id="homeBtn" style="max-width:240px">Start Homing</button>
+  <button class="btn secondary" id="skipHomeBtn" style="max-width:240px">Skip (use current position)</button>
+  <button class="btn danger" id="stopHomeBtn" style="max-width:240px;display:none">&#9209; Stop Homing</button>
   <p id="homingMsg" class="small" style="margin-top:14px"></p>
+</div>
+
+<div id="appLockOverlay" class="lock-overlay hidden">
+  <h2>Controlled externally</h2>
+  <p id="lockedByText">In use by an external app</p>
+  <p class="small">The web controls are disabled while an app is driving the slider.</p>
 </div>
 
 <script>
@@ -214,35 +268,57 @@ async function poll() {
   $('#posVal').textContent = s.pos.toFixed(1);
   $('#progBar').style.width = (s.progress * 100).toFixed(1) + '%';
 
-  // Lock overlay
+  // External control lock (e.g. PrintLapse app took over)
+  if (s.locked) {
+    $('#appLockOverlay').classList.remove('hidden');
+    $('#lockedByText').textContent = s.by ? ('In use by ' + s.by) : 'In use by an external app';
+  } else {
+    $('#appLockOverlay').classList.add('hidden');
+  }
+
+  // Lock overlay (motion is also blocked server-side until homed)
   if (s.homed) {
     $('#lockOverlay').classList.add('hidden');
   } else {
     $('#lockOverlay').classList.remove('hidden');
+    const isHoming = s.stateRaw === 'HOMING';
+    $('#homeBtn').style.display     = isHoming ? 'none'  : 'block';
+    $('#skipHomeBtn').style.display = isHoming ? 'none'  : 'block';
+    $('#stopHomeBtn').style.display = isHoming ? 'block' : 'none';
+    $('#homingMsg').textContent = isHoming ? 'Finding limit switch...' : '';
   }
 
-  // Auto buttons swap
-  const isAuto = s.state === 'AUTO_MOVE' || s.state === 'AUTO_REPOSITION';
-  $('#autoStart').style.display = isAuto ? 'none' : 'block';
-  $('#autoStop').style.display  = isAuto ? 'block' : 'none';
+  // Calibration spin button doubles as a Stop while spinning
+  const spinning = s.stateRaw === 'CALIBRATE';
+  const cs = $('#calSpin');
+  cs.textContent = spinning ? '⏹ Stop' : '▶ Spin';
+  cs.classList.toggle('danger', spinning);
+
+  // Auto buttons swap based on state
+  const st = s.stateRaw;
+  const isMoving = st === 'AUTO_MOVE' || st === 'AUTO_REPOSITION';
+  const isPaused = st === 'AUTO_PAUSED';
+  const isActive = isMoving || isPaused;
+
+  $('#autoStart').style.display  = isActive ? 'none'  : 'block';
+  $('#autoPause').style.display  = isMoving ? 'block' : 'none';
+  $('#autoResume').style.display = isPaused ? 'block' : 'none';
+  $('#autoStop').style.display   = isActive ? 'block' : 'none';
 }
 setInterval(poll, 150);
 poll();
 
 // ---- Homing ----
 $('#homeBtn').addEventListener('click', async () => {
-  $('#homeBtn').disabled = true;
   $('#homingMsg').textContent = 'Moving to limit switch...';
   await api('/api/home', { method:'POST' });
-  let tries = 0;
-  const t = setInterval(() => {
-    if (state.homed) { clearInterval(t); $('#homeBtn').disabled = false; }
-    if (++tries > 400) {
-      clearInterval(t);
-      $('#homeBtn').disabled = false;
-      $('#homingMsg').textContent='Timed out. Check wiring.';
-    }
-  }, 250);
+});
+$('#skipHomeBtn').addEventListener('click', () => api('/api/skiphome', { method:'POST' }));
+$('#stopHomeBtn').addEventListener('click', () => api('/api/estop', { method:'POST' }));
+
+// ---- Jog speed slider ----
+$('#jogSpeed').addEventListener('input', e => {
+  $('#jogSpeedVal').textContent = parseFloat(e.target.value).toFixed(1);
 });
 
 // ---- Manual jog: press & hold ----
@@ -252,7 +328,7 @@ function bindJog(el, dir) {
     api('/api/manual', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'start',dir})
+      body:JSON.stringify({action:'start',dir,speed:parseFloat($('#jogSpeed').value)})
     });
   };
   const stop = e => {
@@ -296,24 +372,53 @@ $('#autoStop').addEventListener('click', () => {
     body:JSON.stringify({action:'stop'})
   });
 });
+$('#autoPause').addEventListener('click', () => {
+  api('/api/auto', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'pause'})
+  });
+});
+$('#autoResume').addEventListener('click', () => {
+  api('/api/auto', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'resume'})
+  });
+});
+
+// ---- Re-home from Manual page ----
+$('#rehome').addEventListener('click', () => {
+  api('/api/home', { method:'POST' });
+});
 
 // ---- Settings ----
 async function loadSettings() {
   const s = await api('/api/settings');
   if (!s) return;
-  $('#setStepsMm').value    = s.stepsPerMm;
-  $('#setMaxTravel').value  = s.maxTravelMm;
-  $('#setMaxSpeed').value   = s.maxSpeedMmS;
-  $('#setAccel').value      = s.accelMmS2;
-  $('#setUseAccel').checked = s.useAccel;
+  $('#setMmPerRev').value     = (Math.round(s.mmPerRev * 1000) / 1000);
+  $('#setMaxTravel').value    = s.maxTravelMm;
+  $('#setMaxSpeed').value     = s.maxSpeedMmS;
+  $('#setAccel').value        = s.accelMmS2;
+  $('#setHomingSpeed').value  = s.homingSpeedMmS;
+  $('#setUseAccel').checked   = s.useAccel;
+  $('#setInvertDir').checked  = s.invertDir;
+
+  // Jog speed slider: cap at max speed, keep current value if still in range.
+  const js = $('#jogSpeed');
+  js.max = s.maxSpeedMmS;
+  if (parseFloat(js.value) > s.maxSpeedMmS) js.value = s.maxSpeedMmS;
+  $('#jogSpeedVal').textContent = parseFloat(js.value).toFixed(1);
 }
 $('#settingsSave').addEventListener('click', async () => {
   const payload = {
-    stepsPerMm:   parseFloat($('#setStepsMm').value),
+    mmPerRev:     parseFloat($('#setMmPerRev').value),
     maxTravelMm:  parseFloat($('#setMaxTravel').value),
     maxSpeedMmS:  parseFloat($('#setMaxSpeed').value),
     accelMmS2:    parseFloat($('#setAccel').value),
-    useAccel:     $('#setUseAccel').checked
+    homingSpeedMmS: parseFloat($('#setHomingSpeed').value),
+    useAccel:     $('#setUseAccel').checked,
+    invertDir:    $('#setInvertDir').checked
   };
   const r = await api('/api/settings', {
     method:'POST',
@@ -323,8 +428,55 @@ $('#settingsSave').addEventListener('click', async () => {
   $('#settingsSave').textContent = r ? 'Saved ✓' : 'Save failed';
   setTimeout(() => $('#settingsSave').textContent = 'Save Settings', 1500);
 });
-$('#settingsReload').addEventListener('click', loadSettings);
 loadSettings();
+
+// ---- Calibration ----
+$('#calSpin').addEventListener('click', async () => {
+  // While spinning, the button acts as an emergency Stop
+  if (state.stateRaw === 'CALIBRATE') {
+    await api('/api/estop', { method:'POST' });
+    $('#calMsg').textContent = 'Stopped.';
+    return;
+  }
+  const turns = parseFloat($('#calTurns').value) || 0;
+  if (turns <= 0) { $('#calMsg').textContent = 'Enter a turn count first.'; return; }
+  $('#calMsg').textContent = 'Spinning ' + turns + ' turn(s)... press Stop to abort. Make sure the carriage has room.';
+  const r = await api('/api/calibrate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'spin', turns})
+  });
+  if (!r) $('#calMsg').textContent = 'Could not spin. Home or skip homing first, and wait until idle.';
+});
+$('#calApply').addEventListener('click', async () => {
+  const turns    = parseFloat($('#calTurns').value) || 0;
+  const measured = parseFloat($('#calMeasured').value) || 0;
+  if (turns <= 0 || measured <= 0) { $('#calMsg').textContent = 'Enter turns and measured mm first.'; return; }
+  const r = await api('/api/calibrate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'apply', turns, measured})
+  });
+  if (r && r.ok) {
+    $('#calMsg').textContent = 'Calibrated ✓  steps/mm = ' + r.stepsPerMm.toFixed(2) + ', mm/turn = ' + r.mmPerRev.toFixed(3);
+    loadSettings();
+  } else {
+    $('#calMsg').textContent = 'Calibration rejected (resulting steps/mm out of range).';
+  }
+});
+
+// ---- Network (status + forget only; full setup lives on the AP page) ----
+async function loadWifiStatus() {
+  const w = await api('/api/wifi');
+  if (!w) return;
+  $('#wifiSsid').textContent = w.ssid || '—';
+  $('#wifiIp').textContent   = w.ip   || '—';
+}
+$('#wifiForget').addEventListener('click', async () => {
+  $('#wifiMsg').textContent = 'Cleared. Restarting back into CameraSlider setup AP…';
+  await api('/api/wifi/forget', { method:'POST' });
+});
+loadWifiStatus();
 </script>
 </body>
 </html>

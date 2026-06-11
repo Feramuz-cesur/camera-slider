@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Camera Slider &middot; Wi-Fi Setup</title>
+<style>
+  :root{
+    --bg:#0e1014; --card:#171a21; --line:#252a35; --text:#e7ecf3;
+    --muted:#8a93a6; --accent:#4ea1ff; --accent2:#2b6cb0;
+    --ok:#3ddc97; --warn:#ffb84d; --bad:#ff5d6c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none}
+  header{padding:18px 16px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#13171f,#0e1014)}
+  header h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.3px}
+  header p{margin:4px 0 0;color:var(--muted);font-size:12px}
+  main{padding:16px;max-width:480px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+  .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .card h2{margin:0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+
+  /* WiFiManager-style scanned network list */
+  .nets{display:flex;flex-direction:column;gap:6px;margin:0 0 4px}
+  .net{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--line);
+    border-radius:10px;background:#0f1218;cursor:pointer;transition:border-color .12s,background .12s}
+  .net:hover{border-color:var(--accent2);background:#12161f}
+  .net.sel{border-color:var(--accent);background:#11203a}
+  .net .name{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .net .lock{color:var(--muted);font-size:12px;flex:none}
+  .net.sel .name{color:var(--accent)}
+
+  /* signal bars */
+  .sig{display:flex;align-items:flex-end;gap:2px;height:16px;flex:none}
+  .sig i{width:3px;border-radius:1px;background:#2c3342}
+  .sig i:nth-child(1){height:5px} .sig i:nth-child(2){height:8px}
+  .sig i:nth-child(3){height:11px} .sig i:nth-child(4){height:14px}
+  .sig.s1 i:nth-child(-n+1),.sig.s2 i:nth-child(-n+2),
+  .sig.s3 i:nth-child(-n+3),.sig.s4 i:nth-child(-n+4){background:var(--ok)}
+  .sig.s1 i:nth-child(-n+1){background:var(--warn)}
+
+  .hint{color:var(--muted);font-size:12px;text-align:center;padding:10px 0}
+
+  .field{display:flex;justify-content:space-between;align-items:center;margin:10px 0;gap:10px}
+  .field label{color:var(--muted);font-size:13px;flex:none}
+  .field input{background:#0f1218;border:1px solid var(--line);color:var(--text);
+    padding:10px;border-radius:8px;font:inherit;flex:1;min-width:0}
+  .btn{display:block;width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);
+    background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer;margin-top:10px}
+  .btn.secondary{background:#1d2230;color:var(--text)}
+  .btn.tiny{width:auto;padding:7px 12px;margin:0;font-size:12px;border-radius:8px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;justify-content:space-between;align-items:center;margin:6px 0}
+  .row .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  .row .val{font-weight:600}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
+  .dot.ok{background:var(--ok)} .dot.ap{background:var(--warn)}
+  .small{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+  .msg{font-size:13px;margin-top:10px;min-height:18px}
+  .msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Camera Slider</h1>
+  <p>Wi-Fi Setup &mdash; connect the slider to your network</p>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Current</h2>
+    <div class="row"><span class="label">Mode</span><span class="val"><span id="modeDot" class="dot"></span><span id="mode">—</span></span></div>
+    <div class="row"><span class="label">Address</span><span id="ip" class="val">—</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Choose a network</h2>
+      <button class="btn secondary tiny" id="scan">Rescan</button>
+    </div>
+    <div class="nets" id="list"></div>
+    <div class="hint" id="hint">Scanning…</div>
+  </div>
+
+  <div class="card">
+    <h2>Credentials</h2>
+    <div class="field">
+      <label>SSID</label>
+      <input type="text" id="ssid" placeholder="network name" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="pass" placeholder="password" autocomplete="off">
+    </div>
+    <label class="small" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="showPass"> Show password
+    </label>
+    <button class="btn" id="connect">Save &amp; Connect</button>
+    <p id="msg" class="msg"></p>
+  </div>
+
+  <div class="card">
+    <p class="small">After connecting, the <b>CameraSlider</b> Wi-Fi disappears. Rejoin your home Wi-Fi, then open
+      <b>http://camera-slider.local</b> (or the slider's new IP) to reach the controls. If the connection fails,
+      the slider returns to this setup AP.</p>
+  </div>
+</main>
+
+<script>
+const $ = q => document.querySelector(q);
+
+async function api(path, opts){
+  try{ const r = await fetch(path, opts); if(!r.ok) throw 0; return await r.json(); }
+  catch(e){ return null; }
+}
+
+async function loadStatus(){
+  const w = await api('/api/wifi');
+  if(!w) return;
+  const sta = w.mode === 'sta';
+  $('#mode').textContent = sta ? ('Connected to ' + (w.ssid||'')) : ('Access Point (' + (w.apSsid||'setup') + ')');
+  $('#modeDot').className = 'dot ' + (sta ? 'ok' : 'ap');
+  $('#ip').textContent = w.ip || '—';
+}
+
+// RSSI (dBm) -> 1..4 bars
+function bars(rssi){
+  if(rssi >= -55) return 4;
+  if(rssi >= -65) return 3;
+  if(rssi >= -75) return 2;
+  return 1;
+}
+
+function selectNet(ssid, el){
+  $('#ssid').value = ssid;
+  document.querySelectorAll('.net').forEach(n => n.classList.remove('sel'));
+  if(el) el.classList.add('sel');
+  $('#pass').focus();
+}
+
+async function scan(){
+  $('#scan').disabled = true; $('#scan').textContent = 'Scanning…';
+  const list = $('#list'); const hint = $('#hint');
+  list.innerHTML = ''; hint.style.display = 'block'; hint.textContent = 'Scanning…';
+
+  const nets = await api('/api/wifi/scan');
+  $('#scan').disabled = false; $('#scan').textContent = 'Rescan';
+
+  if(!nets || !nets.length){ hint.textContent = 'No networks found.'; return; }
+  hint.style.display = 'none';
+
+  // strongest first, drop duplicate SSIDs
+  nets.sort((a,b)=>b.rssi-a.rssi);
+  const seen = new Set();
+  for(const n of nets){
+    if(!n.ssid || seen.has(n.ssid)) continue;
+    seen.add(n.ssid);
+
+    const row = document.createElement('div');
+    row.className = 'net' + (n.ssid === $('#ssid').value ? ' sel' : '');
+
+    const b = bars(n.rssi);
+    row.innerHTML =
+      '<span class="name"></span>' +
+      (n.lock ? '<span class="lock">🔒</span>' : '') +
+      '<span class="sig s'+b+'"><i></i><i></i><i></i><i></i></span>';
+    row.querySelector('.name').textContent = n.ssid;   // safe against weird SSIDs
+    row.addEventListener('click', () => selectNet(n.ssid, row));
+    list.appendChild(row);
+  }
+}
+
+$('#scan').addEventListener('click', scan);
+$('#showPass').addEventListener('change', e => { $('#pass').type = e.target.checked ? 'text' : 'password'; });
+
+$('#connect').addEventListener('click', async () => {
+  const ssid = $('#ssid').value.trim();
+  const pass = $('#pass').value;
+  if(!ssid){ $('#msg').className='msg bad'; $('#msg').textContent='Pick or type a network first.'; return; }
+  $('#connect').disabled = true;
+  $('#msg').className='msg ok';
+  $('#msg').textContent = 'Saved. Restarting to connect to "' + ssid + '"… Rejoin your home Wi-Fi, then open http://camera-slider.local';
+  await api('/api/wifi', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ssid, pass})
+  });
+});
+
+loadStatus();
+scan();   // auto-scan as soon as the page opens
+</script>
+</body>
+</html>

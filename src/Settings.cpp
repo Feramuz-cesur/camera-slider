@@ -4,7 +4,7 @@
 
 #define EEPROM_SIZE     128
 #define EEPROM_ADDR     0
-#define SETTINGS_MAGIC  0xCA15   // "CAm SLider" v1
+#define SETTINGS_MAGIC  0xCA17   // v3: added homingSpeedMmS (struct layout changed)
 
 SliderSettings settings;
 
@@ -21,11 +21,14 @@ static uint16_t calcChecksum(const SliderSettings& s) {
 
 void Settings_loadDefaults() {
     settings.magic        = SETTINGS_MAGIC;
-    settings.stepsPerMm   = DEFAULT_STEPS_PER_MM;
+    settings.stepsPerRev  = DEFAULT_STEPS_PER_REV;
+    settings.stepsPerMm   = DEFAULT_STEPS_PER_REV / DEFAULT_MM_PER_REV;
     settings.maxTravelMm  = DEFAULT_MAX_TRAVEL_MM;
     settings.maxSpeedMmS  = DEFAULT_MAX_SPEED_MMS;
     settings.accelMmS2    = DEFAULT_ACCEL_MMS2;
+    settings.homingSpeedMmS = DEFAULT_HOMING_SPEED_MMS;
     settings.useAccel     = DEFAULT_USE_ACCEL;
+    settings.invertDir    = DEFAULT_INVERT_DIR;
     settings.checksum     = calcChecksum(settings);
 }
 
