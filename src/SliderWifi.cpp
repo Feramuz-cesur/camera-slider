@@ -1,8 +1,8 @@
 #include "SliderWifi.h"
 #include "Config.h"
 
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
+#include <WiFi.h>
+#include <ESPmDNS.h>
 #include <DNSServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -26,6 +26,10 @@ static bool loadCreds(String& ssid, String& pass) {
 static void startAP() {
     // AP_STA so the radio can still scan for networks while serving the portal.
     WiFi.mode(WIFI_AP_STA);
+    // Modem power-save makes the AP slow to associate and laggy to respond
+    // (clients, esp. Windows PCs, wait through the radio's sleep windows).
+    // Keep the radio always on - this is the single biggest AP responsiveness win.
+    WiFi.setSleep(false);
     WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL);
     // Captive portal: answer every DNS query with our own IP so the phone's
     // "is there internet?" probe hits us and auto-opens the interface.
@@ -36,12 +40,13 @@ static void startAP() {
 }
 
 void Wifi_begin() {
-    LittleFS.begin();
+    LittleFS.begin(true);   // format on first boot
     WiFi.persistent(false);
 
     String ssid, pass;
     if (loadCreds(ssid, pass)) {
         WiFi.mode(WIFI_STA);
+        WiFi.setSleep(false);   // lower request latency, snappier web UI
         WiFi.begin(ssid.c_str(), pass.c_str());
 
         uint32_t start = millis();
@@ -86,5 +91,5 @@ String Wifi_ssid()      { return g_sta ? WiFi.SSID() : String(AP_SSID); }
 
 void Wifi_loop() {
     if (g_ap)  dnsServer.processNextRequest();
-    if (g_sta) MDNS.update();
+    // ESP32 mDNS runs in its own task; no update() call needed.
 }

@@ -4,12 +4,12 @@
 #include "Settings.h"
 #include "Config.h"
 
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
+#include <WiFi.h>
+#include <WebServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
-static ESP8266WebServer server(80);
+static WebServer server(80);
 static uint32_t g_rebootAt = 0;   // 0 = no pending reboot
 
 // External control lock (e.g. PrintLapse app takes over the slider)
@@ -280,7 +280,7 @@ static void handleWifiScan() {
         JsonObject o = arr.add<JsonObject>();
         o["ssid"] = WiFi.SSID(i);
         o["rssi"] = WiFi.RSSI(i);
-        o["lock"] = (WiFi.encryptionType(i) != ENC_TYPE_NONE);
+        o["lock"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
     }
     WiFi.scanDelete();
     String out;

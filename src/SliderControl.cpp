@@ -3,7 +3,9 @@
 #include "Config.h"
 #include <AccelStepper.h>
 
-static AccelStepper stepper(AccelStepper::DRIVER, PIN_STEP, PIN_DIR);
+// 28BYJ-48 + ULN2003 in half-step mode. AccelStepper expects coil order
+// IN1, IN3, IN2, IN4 for this motor.
+static AccelStepper stepper(AccelStepper::HALF4WIRE, PIN_IN1, PIN_IN3, PIN_IN2, PIN_IN4);
 static SliderState  state = STATE_BOOT;
 static bool         homed = false;
 
@@ -20,18 +22,13 @@ static inline float stepsToMm(long st)   { return (float)st / settings.stepsPerM
 
 // ---------- Setup ----------
 void Slider_begin() {
-    pinMode(PIN_ENABLE, OUTPUT);
-    digitalWrite(PIN_ENABLE, MOTOR_DISABLED);   // keep motor off during boot
-
     pinMode(PIN_LIMIT, INPUT_PULLUP);
 
     stepper.setPinsInverted(settings.invertDir, false, false);
     stepper.setMaxSpeed(settings.maxSpeedMmS * settings.stepsPerMm);
     stepper.setAcceleration(settings.accelMmS2 * settings.stepsPerMm);
     stepper.setCurrentPosition(0);
-
-    // Enable driver now that pin levels are stable
-    digitalWrite(PIN_ENABLE, MOTOR_ENABLED);
+    stepper.disableOutputs();   // de-energize coils until first move (ULN2003 heats otherwise)
 
     state = STATE_BOOT;
     homed = false;
@@ -61,8 +58,8 @@ bool Slider_startHoming() {
     // Move a very large distance toward the limit; will stop on switch.
     long bigSteps = mmToSteps(settings.maxTravelMm + 200.0f);
     stepper.setCurrentPosition(bigSteps);          // pretend we're past max
-    stepper.moveTo(0);                              // target 0 (toward switch if HOMING_DIR_LEVEL = LOW)
-    // Note: actual direction depends on wiring. If wrong, swap HOMING_DIR_LEVEL or invert DIR pin.
+    stepper.moveTo(0);                              // target 0 (toward switch)
+    // Note: actual direction depends on coil wiring. If wrong, enable "invert direction" in settings.
     state = STATE_HOMING_FAST;
     homed = false;
     return true;
@@ -196,6 +193,8 @@ bool Slider_resumeAuto() {
 
 // ---------- Main update ----------
 void Slider_update() {
+    static SliderState prevState = STATE_BOOT;
+
     switch (state) {
 
         case STATE_BOOT:
@@ -316,6 +315,16 @@ void Slider_update() {
             }
             break;
         }
+    }
+
+    // De-energize coils when settling into a resting state (keeps the ULN2003
+    // and motor cool; the 28BYJ-48 gearbox holds position without current).
+    // STATE_AUTO_PAUSED stays energized on purpose (resume without slack).
+    if (state != prevState) {
+        if (state == STATE_IDLE || state == STATE_BOOT || state == STATE_FAULT) {
+            stepper.disableOutputs();
+        }
+        prevState = state;
     }
 }
 

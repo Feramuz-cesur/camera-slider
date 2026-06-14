@@ -305,8 +305,17 @@ async function poll() {
   $('#autoResume').style.display = isPaused ? 'block' : 'none';
   $('#autoStop').style.display   = isActive ? 'block' : 'none';
 }
-setInterval(poll, 150);
-poll();
+// Self-pacing poll: wait for each status response before scheduling the next,
+// so requests never pile up while the (synchronous) server is busy stepping.
+// This keeps the position read-out fresh instead of trailing a backlog.
+const POLL_GAP = 100;   // ms between the end of one status fetch and the next
+async function pollLoop() {
+  for (;;) {
+    await poll();
+    await new Promise(r => setTimeout(r, POLL_GAP));
+  }
+}
+pollLoop();
 
 // ---- Homing ----
 $('#homeBtn').addEventListener('click', async () => {
