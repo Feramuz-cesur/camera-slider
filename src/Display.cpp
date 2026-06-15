@@ -1,7 +1,6 @@
 #include "Display.h"
 #include "Config.h"
 #include "SliderWifi.h"
-#include "SliderControl.h"
 #include <U8g2lib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,18 +20,11 @@ static int16_t scrollX = SCREEN_W;           // marquee position; start off the 
 // Render one frame. Runs only on the display task (sole owner of the u8g2 buffer
 // and the I2C bus), so no locking is needed against the main loop.
 static void drawFrame() {
-    // sendBuffer() blocks ~8 ms on I2C. The C3 is single-core, so even from a
-    // separate task that transfer time-shares the CPU; refresh only while the
-    // motor is at rest so we never disturb step timing mid-move.
-    switch (Slider_state()) {
-        case STATE_BOOT:
-        case STATE_IDLE:
-        case STATE_AUTO_PAUSED:
-        case STATE_FAULT:
-            break;
-        default:
-            return;
-    }
+    // Runs on its own task, so it refreshes during moves too (the display no
+    // longer freezes while the slider is running). The ESP32 I2C driver blocks
+    // this task on a semaphore during the ~8ms transfer, which lets the stepper
+    // task keep running on the single core, so step timing isn't starved.
+
     // Until the radio is up, leave the boot splash in place.
     if (!Wifi_isStation() && !Wifi_apActive()) return;
 
