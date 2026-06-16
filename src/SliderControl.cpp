@@ -3,9 +3,9 @@
 #include "Config.h"
 #include <AccelStepper.h>
 
-// 28BYJ-48 + ULN2003 in half-step mode. AccelStepper expects coil order
-// IN1, IN3, IN2, IN4 for this motor.
-static AccelStepper stepper(AccelStepper::HALF4WIRE, PIN_IN1, PIN_IN3, PIN_IN2, PIN_IN4);
+// NEMA 17 + A4988 step/direction driver. AccelStepper toggles STEP, DIR sets
+// direction, and the ENABLE pin (active LOW) energizes the motor coils.
+static AccelStepper stepper(AccelStepper::DRIVER, PIN_STEP, PIN_DIR);
 static SliderState  state = STATE_BOOT;
 static bool         homed = false;
 
@@ -24,11 +24,14 @@ static inline float stepsToMm(long st)   { return (float)st / settings.stepsPerM
 void Slider_begin() {
     pinMode(PIN_LIMIT, INPUT_PULLUP);
 
-    stepper.setPinsInverted(settings.invertDir, false, false);
+    // A4988 ENABLE is active LOW -> mark the enable pin inverted so
+    // enableOutputs()/disableOutputs() drive it the right way.
+    stepper.setEnablePin(PIN_EN);
+    stepper.setPinsInverted(settings.invertDir, false, true);
     stepper.setMaxSpeed(settings.maxSpeedMmS * settings.stepsPerMm);
     stepper.setAcceleration(settings.accelMmS2 * settings.stepsPerMm);
     stepper.setCurrentPosition(0);
-    stepper.disableOutputs();   // de-energize coils until first move (ULN2003 heats otherwise)
+    stepper.disableOutputs();   // de-energize coils until first move (A4988/motor stay cool)
 
     state = STATE_BOOT;
     homed = false;
@@ -37,7 +40,7 @@ void Slider_begin() {
 void Slider_applySettings() {
     float maxSpeedSteps = settings.maxSpeedMmS * settings.stepsPerMm;
     float accelSteps    = settings.accelMmS2  * settings.stepsPerMm;
-    stepper.setPinsInverted(settings.invertDir, false, false);
+    stepper.setPinsInverted(settings.invertDir, false, true);
     stepper.setMaxSpeed(maxSpeedSteps);
     stepper.setAcceleration(settings.useAccel ? accelSteps : maxSpeedSteps * 50.0f);
 }
@@ -195,6 +198,18 @@ bool Slider_resumeAuto() {
 void Slider_update() {
     static SliderState prevState = STATE_BOOT;
 
+    // Energize / de-energize the A4988 on state changes. With the DRIVER mode
+    // enable pin, disableOutputs() cuts power and step() will NOT re-enable it,
+    // so we must enableOutputs() before any motion. Resting states de-energize
+    // to keep the driver and motor cool; STATE_AUTO_PAUSED stays energized on
+    // purpose so resume continues without losing position.
+    if (state != prevState) {
+        bool resting = (state == STATE_IDLE || state == STATE_BOOT || state == STATE_FAULT);
+        if (resting) stepper.disableOutputs();
+        else         stepper.enableOutputs();
+        prevState = state;
+    }
+
     switch (state) {
 
         case STATE_BOOT:
@@ -315,16 +330,6 @@ void Slider_update() {
             }
             break;
         }
-    }
-
-    // De-energize coils when settling into a resting state (keeps the ULN2003
-    // and motor cool; the 28BYJ-48 gearbox holds position without current).
-    // STATE_AUTO_PAUSED stays energized on purpose (resume without slack).
-    if (state != prevState) {
-        if (state == STATE_IDLE || state == STATE_BOOT || state == STATE_FAULT) {
-            stepper.disableOutputs();
-        }
-        prevState = state;
     }
 }
 

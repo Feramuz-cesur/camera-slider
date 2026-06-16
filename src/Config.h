@@ -2,12 +2,14 @@
 #include <Arduino.h>
 
 // ---------- Pin Definitions (ESP32-C3 0.42" OLED board) ----------
-// ULN2003A driver inputs (28BYJ-48). All four are "safe" pins on this board
-// (no strapping / flash / USB involvement).
-#define PIN_IN1         0   // GPIO0  -> ULN2003 IN1
-#define PIN_IN2         1   // GPIO1  -> ULN2003 IN2
-#define PIN_IN3         3   // GPIO3  -> ULN2003 IN3
-#define PIN_IN4         10  // GPIO10 -> ULN2003 IN4
+// A4988 stepper driver (NEMA 17). STEP/DIR/EN are "safe" pins on this board
+// (no strapping / flash / USB involvement). EN on the A4988 is active-LOW.
+// Wire A4988: STEP, DIR, ENABLE, plus MS1/MS2/MS3 (set by jumpers for the
+// microstep mode — see DRIVER_MICROSTEP below), RESET tied to SLEEP (both HIGH).
+#define PIN_STEP        0   // GPIO0  -> A4988 STEP
+#define PIN_DIR         1   // GPIO1  -> A4988 DIR
+#define PIN_EN          3   // GPIO3  -> A4988 ENABLE (active LOW)
+// GPIO10 is now free (was ULN2003 IN4 on the old 28BYJ-48 setup).
 
 #define PIN_LIMIT       4   // GPIO4  -> Limit Switch (to GND when triggered)
 
@@ -21,8 +23,8 @@
 // ---------- Homing Behavior ----------
 // Fast approach speed toward the switch is user-configurable (settings.homingSpeedMmS);
 // the values below tune the backoff/re-approach phase.
-#define HOMING_BACKOFF_STEPS    200     // back off after touching limit (~2 mm)
-#define HOMING_SLOW_SPEED_S     150     // slow re-approach for accuracy (steps/s)
+#define HOMING_BACKOFF_STEPS    200     // back off after touching limit (~2.5 mm @ 80 steps/mm)
+#define HOMING_SLOW_SPEED_S     400     // slow re-approach for accuracy (steps/s)
 
 // ---------- WiFi Access Point (fallback / provisioning) ----------
 #define AP_SSID         "CameraSlider"
@@ -36,14 +38,17 @@
 #define WIFI_CREDS_FILE      "/wifi.json"      // saved credentials on LittleFS
 
 // ---------- Defaults (used when EEPROM empty) ----------
-// 28BYJ-48 in half-step mode: ~4096 steps per output-shaft revolution.
-// stepsPerMm is derived: stepsPerRev / mmPerRev  (4096 / 40 = 102.4)
-#define DEFAULT_STEPS_PER_REV   4096     // 28BYJ-48 half-step (use calibration to fine-tune)
+// NEMA 17 (1.8°/step = 200 full steps/rev) driven by an A4988 at 1/16 microstep.
+// steps/rev = 200 * 16 = 3200; with a GT2 20T pulley (40 mm/rev) that is
+// 3200 / 40 = 80 steps/mm. Set DRIVER_MICROSTEP to match your A4988 jumpers.
+#define MOTOR_FULL_STEPS_PER_REV 200     // NEMA 17 = 1.8° per full step
+#define DRIVER_MICROSTEP         16      // A4988 MS1/MS2/MS3 jumper setting (1,2,4,8,16)
+#define DEFAULT_STEPS_PER_REV   (MOTOR_FULL_STEPS_PER_REV * DRIVER_MICROSTEP)  // 3200
 #define DEFAULT_MM_PER_REV      40.0f    // GT2 20T pulley travel per turn
 #define DEFAULT_MAX_TRAVEL_MM   300.0f
-#define DEFAULT_MAX_SPEED_MMS   6.0f     // 28BYJ-48 tops out around ~600-700 half-steps/s
-#define DEFAULT_ACCEL_MMS2      20.0f
-#define DEFAULT_HOMING_SPEED_MMS 4.0f    // approach speed toward the limit switch
+#define DEFAULT_MAX_SPEED_MMS   50.0f    // NEMA 17 + A4988 handles much higher rates
+#define DEFAULT_ACCEL_MMS2      80.0f
+#define DEFAULT_HOMING_SPEED_MMS 10.0f   // approach speed toward the limit switch
 #define DEFAULT_USE_ACCEL       true
 #define DEFAULT_INVERT_DIR      false
 

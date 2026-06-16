@@ -4,7 +4,7 @@
 
 #define EEPROM_SIZE     128
 #define EEPROM_ADDR     0
-#define SETTINGS_MAGIC  0xCA17   // v3: added homingSpeedMmS (struct layout changed)
+#define SETTINGS_MAGIC  0xCA18   // v4: switched to NEMA 17 + A4988 (new step/mm defaults)
 
 SliderSettings settings;
 
