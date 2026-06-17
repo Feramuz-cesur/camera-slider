@@ -222,6 +222,7 @@ const $$ = q => document.querySelectorAll(q);
 let state = { homed:false, state:'?', pos:0, progress:0 };
 let autoDir = 'ltr';
 let pollFailures = 0;
+let maxTravelMm = 0;   // cached from settings; used to map position -> progress bar
 
 // ---- Tab switching ----
 $$('nav button').forEach(b => b.addEventListener('click', () => {
@@ -266,7 +267,12 @@ async function poll() {
   $('#connBadge').textContent = 'connected';
   $('#statText').textContent = s.stateText;
   $('#posVal').textContent = s.pos.toFixed(1);
-  $('#progBar').style.width = (s.progress * 100).toFixed(1) + '%';
+  // Progress bar: during an auto move show its completion; otherwise reflect the
+  // physical position along the rail, so the bar also moves while jogging manually.
+  const inAuto = s.stateRaw === 'AUTO_MOVE' || s.stateRaw === 'AUTO_REPOSITION' || s.stateRaw === 'AUTO_PAUSED';
+  let frac = inAuto ? s.progress : (maxTravelMm > 0 ? s.pos / maxTravelMm : 0);
+  frac = Math.max(0, Math.min(1, frac));
+  $('#progBar').style.width = (frac * 100).toFixed(1) + '%';
 
   // External control lock (e.g. PrintLapse app took over)
   if (s.locked) {
@@ -405,6 +411,7 @@ $('#rehome').addEventListener('click', () => {
 async function loadSettings() {
   const s = await api('/api/settings');
   if (!s) return;
+  maxTravelMm = s.maxTravelMm;
   $('#setMmPerRev').value     = (Math.round(s.mmPerRev * 1000) / 1000);
   $('#setMaxTravel').value    = s.maxTravelMm;
   $('#setMaxSpeed').value     = s.maxSpeedMmS;
@@ -420,6 +427,7 @@ async function loadSettings() {
   $('#jogSpeedVal').textContent = parseFloat(js.value).toFixed(1);
 }
 $('#settingsSave').addEventListener('click', async () => {
+  maxTravelMm = parseFloat($('#setMaxTravel').value) || maxTravelMm;
   const payload = {
     mmPerRev:     parseFloat($('#setMmPerRev').value),
     maxTravelMm:  parseFloat($('#setMaxTravel').value),
