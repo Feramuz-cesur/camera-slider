@@ -4,7 +4,7 @@
 
 #define EEPROM_SIZE     128
 #define EEPROM_ADDR     0
-#define SETTINGS_MAGIC  0xCA18   // v4: switched to NEMA 17 + A4988 (new step/mm defaults)
+#define SETTINGS_MAGIC  0xCA19   // v5: added rotary pan axis + start/end positions
 
 SliderSettings settings;
 
@@ -29,6 +29,16 @@ void Settings_loadDefaults() {
     settings.homingSpeedMmS = DEFAULT_HOMING_SPEED_MMS;
     settings.useAccel     = DEFAULT_USE_ACCEL;
     settings.invertDir    = DEFAULT_INVERT_DIR;
+    settings.startMm      = DEFAULT_START_MM;
+    settings.endMm        = DEFAULT_END_MM;
+
+    settings.panStepsPerRev = DEFAULT_PAN_STEPS_PER_REV;
+    settings.panMaxSpeedDegS = DEFAULT_PAN_MAX_SPEED_DEGS;
+    settings.panAccelDegS2   = DEFAULT_PAN_ACCEL_DEGS2;
+    settings.panInvertDir    = DEFAULT_PAN_INVERT_DIR;
+    settings.panStartDeg     = DEFAULT_PAN_START_DEG;
+    settings.panEndDeg       = DEFAULT_PAN_END_DEG;
+
     settings.checksum     = calcChecksum(settings);
 }
 

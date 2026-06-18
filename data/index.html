@@ -8,6 +8,7 @@
   :root{
     --bg:#0e1014; --card:#171a21; --line:#252a35; --text:#e7ecf3;
     --muted:#8a93a6; --accent:#4ea1ff; --accent2:#2b6cb0;
+    --pan:#b07cff; --pan2:#6d3fb0;
     --ok:#3ddc97; --warn:#ffb84d; --bad:#ff5d6c;
   }
   *{box-sizing:border-box}
@@ -22,10 +23,12 @@
   .badge.ok{background:#0e3826;color:var(--ok)}
   .badge.warn{background:#3a2c10;color:var(--warn)}
   .badge.bad{background:#3a1418;color:var(--bad)}
-  .status{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+  .status{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card)}
   .row{display:flex;justify-content:space-between;align-items:center;margin:4px 0}
   .row .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
   .row .val{font-variant-numeric:tabular-nums;font-weight:600}
+  .statline{display:flex;gap:16px}
+  .statline .val{font-weight:600}
   .progress{height:6px;background:#222836;border-radius:6px;overflow:hidden;margin-top:8px}
   .progress > div{height:100%;background:linear-gradient(90deg,var(--accent),#7ec4ff);width:0%;transition:width .15s linear}
   nav{display:flex;border-bottom:1px solid var(--line);background:#10131a}
@@ -37,10 +40,14 @@
   section.active{display:block}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
   .card h2{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+  .card h2 .axistag{float:right;font-size:11px;padding:1px 8px;border-radius:999px;letter-spacing:.4px}
+  .axistag.lin{background:#13314f;color:#9fd0ff}
+  .axistag.rot{background:#2c1f47;color:#cdb0ff}
   .jog{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .jog button{padding:28px 0;font-size:18px;font-weight:600;border-radius:10px;border:1px solid var(--line);
+  .jog button{padding:24px 0;font-size:17px;font-weight:600;border-radius:10px;border:1px solid var(--line);
     background:#1d2230;color:var(--text);cursor:pointer;touch-action:manipulation}
   .jog button:active{background:var(--accent2)}
+  .jog.rot button:active{background:var(--pan2)}
   .btn{display:block;width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);
     background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer;margin-top:8px}
   .btn.secondary{background:#1d2230;color:var(--text)}
@@ -57,13 +64,49 @@
   .seg{display:flex;background:#0f1218;border:1px solid var(--line);border-radius:10px;padding:3px;margin:8px 0}
   .seg button{flex:1;background:none;border:0;color:var(--muted);padding:10px 0;border-radius:8px;font:inherit;cursor:pointer}
   .seg button.on{background:var(--accent2);color:#fff}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .small{font-size:12px;color:var(--muted)}
+
+  /* ---- Dual-thumb linear range ---- */
+  .range2{position:relative;height:46px;margin:18px 4px 6px}
+  .range2 .track{position:absolute;top:20px;left:0;right:0;height:6px;border-radius:6px;background:#0f1218;border:1px solid var(--line)}
+  .range2 .fill{position:absolute;top:20px;height:6px;border-radius:6px;background:linear-gradient(90deg,var(--accent),#7ec4ff)}
+  .range2 .cur{position:absolute;top:13px;width:2px;height:20px;background:var(--ok);border-radius:2px;transform:translateX(-1px);transition:left .15s linear}
+  .range2 .thumb{position:absolute;top:11px;width:24px;height:24px;margin-left:-12px;border-radius:50%;
+    background:#e7ecf3;border:3px solid var(--accent);cursor:grab;touch-action:none;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .range2 .thumb:active{cursor:grabbing}
+  .range2 .thumb.end{border-color:#7ec4ff}
+  .range2 .thumb .tip{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);font-size:10px;
+    color:var(--muted);white-space:nowrap}
+
+  .rangefields{display:flex;gap:10px;margin-top:6px}
+  .rangefields .rf{flex:1;display:flex;flex-direction:column;gap:4px}
+  .rangefields .rf span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .rangefields .rf input{background:#0f1218;border:1px solid var(--line);color:var(--text);
+    padding:9px 10px;border-radius:8px;font:inherit;text-align:center;width:100%}
+  .miniact{display:flex;gap:8px;margin-top:10px}
+  .miniact button{flex:1;background:#1d2230;border:1px solid var(--line);color:var(--text);
+    padding:9px 0;border-radius:8px;font:inherit;font-size:12px;cursor:pointer}
+  .miniact button:active{background:var(--accent2)}
+
+  /* ---- Rotary dial ---- */
+  .dialwrap{display:flex;justify-content:center;margin:6px 0 4px}
+  .dial{touch-action:none}
+  .dial .ring{fill:none;stroke:#0f1218;stroke-width:8}
+  .dial .arc{fill:none;stroke:var(--pan);stroke-width:8;stroke-linecap:round}
+  .dial .tick{stroke:var(--line);stroke-width:1}
+  .dial .needle{stroke:var(--ok);stroke-width:2;stroke-linecap:round}
+  .dial .center{fill:var(--muted)}
+  .dial .handle{fill:#e7ecf3;stroke:var(--pan);stroke-width:3;cursor:grab}
+  .dial .handle.end{stroke:#caa6ff}
+  .dial text{fill:var(--muted);font-size:10px}
+  .dial .big{fill:var(--text);font-size:15px;font-weight:600}
+
   .lock-overlay{position:fixed;inset:0;background:rgba(8,10,14,.85);backdrop-filter:blur(4px);
     display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:50}
   .lock-overlay.hidden{display:none}
   .lock-overlay h2{margin:0 0 8px;font-size:18px}
   .lock-overlay p{margin:0 0 18px;color:var(--muted);text-align:center;max-width:300px}
-  .hint{font-size:12px;color:var(--muted);margin-top:6px}
-  .small{font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -75,7 +118,12 @@
 
 <div class="status">
   <div class="row"><span class="label">Status</span><span id="statText" class="val">—</span></div>
-  <div class="row"><span class="label">Position</span><span class="val"><span id="posVal">0.0</span> mm</span></div>
+  <div class="row">
+    <span class="statline">
+      <span class="val" style="color:var(--accent)">↔ <span id="posVal">0.0</span> mm</span>
+      <span class="val" style="color:var(--pan)">⟳ <span id="panVal">0.0</span>°</span>
+    </span>
+  </div>
   <div class="progress"><div id="progBar"></div></div>
 </div>
 
@@ -89,7 +137,7 @@
 
   <section id="tab-manual" class="active">
     <div class="card">
-      <h2>Jog Control</h2>
+      <h2>Slider Jog <span class="axistag lin">LINEAR</span></h2>
       <div class="jog">
         <button id="jogL">&#9664;  LEFT</button>
         <button id="jogR">RIGHT  &#9654;</button>
@@ -101,34 +149,84 @@
         </div>
         <input type="range" id="jogSpeed" min="0" max="60" step="0.5" value="30">
       </div>
-      <p class="hint">Press and hold a button to move. Release to stop.</p>
+    </div>
+    <div class="card">
+      <h2>Pan Jog <span class="axistag rot">ROTARY</span></h2>
+      <div class="jog rot">
+        <button id="jogCCW">&#8634;  CCW</button>
+        <button id="jogCW">CW  &#8635;</button>
+      </div>
+      <div class="slider">
+        <div class="slider-head">
+          <span class="label">Jog speed</span>
+          <span class="val"><span id="panJogSpeedVal">45</span> &deg;/s</span>
+        </div>
+        <input type="range" id="panJogSpeed" min="0" max="180" step="1" value="45">
+      </div>
+      <p class="hint">Press and hold to move. Release to stop.</p>
     </div>
     <div class="card">
       <h2>Quick Actions</h2>
       <button class="btn secondary" id="gotoHome">Go to Home (0 mm)</button>
-      <button class="btn secondary" id="rehome">Re-Home (recalibrate)</button>
+      <button class="btn secondary" id="rehome">Re-Home Slider</button>
+      <button class="btn secondary" id="motorsBtn">Disable Steppers</button>
       <button class="btn danger" id="estop">Emergency Stop</button>
-      <p class="hint">Use Re-Home if the carriage seems to have lost steps and the position display drifted.</p>
+      <p class="hint">Steppers stay energized (holding torque) by default. Disable to release them so the rig can be moved by hand; any move re-enables them.</p>
     </div>
   </section>
 
   <section id="tab-auto">
     <div class="card">
-      <h2>Direction</h2>
-      <div class="seg" id="dirSeg">
-        <button data-dir="ltr" class="on">Left &rarr; Right</button>
-        <button data-dir="rtl">Right &rarr; Left</button>
+      <h2>Slider Path <span class="axistag lin">LINEAR</span></h2>
+      <div class="range2" id="linRange">
+        <div class="track"></div>
+        <div class="fill" id="linFill"></div>
+        <div class="cur" id="linCur"></div>
+        <div class="thumb start" id="linStart" data-key="sStart"><span class="tip">start</span></div>
+        <div class="thumb end" id="linEnd" data-key="sEnd"><span class="tip">end</span></div>
+      </div>
+      <div class="rangefields">
+        <label class="rf"><span>Start (mm)</span><input type="number" id="sStart" min="0" step="1"></label>
+        <label class="rf"><span>End (mm)</span><input type="number" id="sEnd" min="0" step="1"></label>
+      </div>
+      <div class="miniact">
+        <button data-axis="slider" data-edge="start">Go to start</button>
+        <button data-axis="slider" data-edge="end">Go to end</button>
       </div>
     </div>
+
     <div class="card">
-      <h2>Duration</h2>
+      <h2>Pan Path <span class="axistag rot">ROTARY</span></h2>
+      <div class="dialwrap">
+        <svg id="dial" class="dial" width="220" height="220" viewBox="0 0 220 220">
+          <circle class="ring" cx="110" cy="110" r="82"></circle>
+          <path class="arc" id="panArc"></path>
+          <line class="needle" id="panNeedle" x1="110" y1="110" x2="110" y2="36"></line>
+          <circle class="center" cx="110" cy="110" r="3"></circle>
+          <text id="panAngleTxt" class="big" x="110" y="150" text-anchor="middle">0°</text>
+          <circle class="handle start" id="panStartH" r="11" data-key="pStart"></circle>
+          <circle class="handle end" id="panEndH" r="11" data-key="pEnd"></circle>
+        </svg>
+      </div>
+      <div class="rangefields">
+        <label class="rf"><span>Start (°)</span><input type="number" id="pStart" min="0" max="360" step="1"></label>
+        <label class="rf"><span>End (°)</span><input type="number" id="pEnd" min="0" max="360" step="1"></label>
+      </div>
+      <div class="miniact">
+        <button data-axis="pan" data-edge="start">Go to start</button>
+        <button data-axis="pan" data-edge="end">Go to end</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Move</h2>
       <div class="field">
         <label>Travel time</label>
         <input type="number" id="autoDur" min="1" max="3600" step="1" value="20">
       </div>
-      <p class="small">seconds &mdash; full rail length, at constant speed</p>
+      <p class="small">seconds &mdash; both axes go from start to end together, finishing at the same time.</p>
     </div>
-    <button class="btn" id="autoStart">Start</button>
+    <button class="btn" id="autoStart">Start Move</button>
     <button class="btn secondary" id="autoPause" style="display:none">Pause</button>
     <button class="btn" id="autoResume" style="display:none">Resume</button>
     <button class="btn danger" id="autoStop" style="display:none">Stop</button>
@@ -136,7 +234,7 @@
 
   <section id="tab-settings">
     <div class="card">
-      <h2>Mechanical</h2>
+      <h2>Slider — Mechanical <span class="axistag lin">LINEAR</span></h2>
       <div class="field">
         <label>mm per revolution</label>
         <input type="number" id="setMmPerRev" min="0.1" max="1000" step="0.1">
@@ -149,30 +247,10 @@
         <label>Flip direction</label>
         <input type="checkbox" id="setInvertDir">
       </div>
-      <p class="small">mm the carriage travels per full motor turn. Flip direction if LEFT/RIGHT or homing run the wrong way. Use Calibration below if mm/turn is unknown.</p>
+      <p class="small">mm the carriage travels per full motor turn. Flip direction if LEFT/RIGHT or homing run the wrong way.</p>
     </div>
     <div class="card">
-      <h2>Calibration</h2>
-      <p class="small">Spin a known number of turns, measure how far the carriage actually moved, then apply. This sets mm/turn precisely.</p>
-      <div class="field">
-        <label>Turns to spin</label>
-        <input type="number" id="calTurns" min="0.1" max="100" step="0.1" value="2">
-      </div>
-      <button class="btn secondary" id="calSpin">&#9654; Spin</button>
-      <div class="field">
-        <label>Measured travel (mm)</label>
-        <input type="number" id="calMeasured" min="0.1" max="2000" step="0.1">
-      </div>
-      <button class="btn" id="calApply">Apply Calibration</button>
-      <p id="calMsg" class="small" style="margin-top:8px"></p>
-      <div class="field" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
-        <label>Homing speed (mm/s)</label>
-        <input type="number" id="setHomingSpeed" min="1" max="500" step="0.5">
-      </div>
-      <p class="small">Speed used to drive toward the limit switch when homing. Lower = gentler &amp; more accurate stop.</p>
-    </div>
-    <div class="card">
-      <h2>Motion Profile</h2>
+      <h2>Slider — Motion</h2>
       <div class="field">
         <label>Max speed (mm/s)</label>
         <input type="number" id="setMaxSpeed" min="1" max="500" step="0.5">
@@ -185,7 +263,45 @@
         <label>Smooth ramping</label>
         <input type="checkbox" id="setUseAccel">
       </div>
-      <p class="small">Disable smooth ramping to run at max speed instantly (may cause step loss on heavy loads).</p>
+      <div class="field">
+        <label>Homing speed (mm/s)</label>
+        <input type="number" id="setHomingSpeed" min="1" max="500" step="0.5">
+      </div>
+    </div>
+    <div class="card">
+      <h2>Pan — Rotary <span class="axistag rot">ROTARY</span></h2>
+      <div class="field">
+        <label>Steps per 360&deg; turn</label>
+        <input type="number" id="setPanStepsPerRev" min="1" max="60000" step="1">
+      </div>
+      <div class="field">
+        <label>Max speed (&deg;/s)</label>
+        <input type="number" id="setPanMaxSpeed" min="1" max="2000" step="1">
+      </div>
+      <div class="field">
+        <label>Acceleration (&deg;/s&sup2;)</label>
+        <input type="number" id="setPanAccel" min="1" max="10000" step="1">
+      </div>
+      <div class="field">
+        <label>Flip direction</label>
+        <input type="checkbox" id="setPanInvertDir">
+      </div>
+      <p class="small">Steps for one full platform turn. Direct drive on a 1/16 NEMA 17 = 3200; raise it for a geared head.</p>
+    </div>
+    <div class="card">
+      <h2>Calibration <span class="axistag lin">LINEAR</span></h2>
+      <p class="small">Spin a known number of turns, measure the travel, then apply to set mm/turn precisely.</p>
+      <div class="field">
+        <label>Turns to spin</label>
+        <input type="number" id="calTurns" min="0.1" max="100" step="0.1" value="2">
+      </div>
+      <button class="btn secondary" id="calSpin">&#9654; Spin</button>
+      <div class="field">
+        <label>Measured travel (mm)</label>
+        <input type="number" id="calMeasured" min="0.1" max="2000" step="0.1">
+      </div>
+      <button class="btn" id="calApply">Apply Calibration</button>
+      <p id="calMsg" class="small" style="margin-top:8px"></p>
     </div>
     <button class="btn" id="settingsSave">Save Settings</button>
     <div class="card" style="margin-top:12px">
@@ -193,7 +309,7 @@
       <div class="row"><span class="label">Connected to</span><span id="wifiSsid" class="val">&mdash;</span></div>
       <div class="row"><span class="label">IP</span><span id="wifiIp" class="val">&mdash;</span></div>
       <button class="btn danger" id="wifiForget">Forget Network</button>
-      <p class="small">Clears the saved Wi-Fi and restarts into the CameraSlider setup AP so you can pick a new network.</p>
+      <p class="small">Clears saved Wi-Fi and restarts into the CameraSlider setup AP.</p>
       <p id="wifiMsg" class="small" style="margin-top:6px"></p>
     </div>
   </section>
@@ -202,7 +318,7 @@
 
 <div id="lockOverlay" class="lock-overlay">
   <h2>Homing</h2>
-  <p>Home the slider to set an accurate reference, or skip and use the current position as 0 mm.</p>
+  <p>Home the slider for an accurate reference, or skip and use the current position as 0.</p>
   <button class="btn" id="homeBtn" style="max-width:240px">Start Homing</button>
   <button class="btn secondary" id="skipHomeBtn" style="max-width:240px">Skip (use current position)</button>
   <button class="btn danger" id="stopHomeBtn" style="max-width:240px;display:none">&#9209; Stop Homing</button>
@@ -218,11 +334,14 @@
 <script>
 const $ = q => document.querySelector(q);
 const $$ = q => document.querySelectorAll(q);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 
-let state = { homed:false, state:'?', pos:0, progress:0 };
-let autoDir = 'ltr';
+let state = { homed:false, state:'?', pos:0, panPos:0, progress:0 };
 let pollFailures = 0;
-let maxTravelMm = 0;   // cached from settings; used to map position -> progress bar
+
+// Geometry / shot config, seeded from /api/settings.
+let cfg = { maxTravelMm:300, panMaxDeg:360, sStart:0, sEnd:300, pStart:0, pEnd:360 };
+let curMm = 0, curPan = 0;
 
 // ---- Tab switching ----
 $$('nav button').forEach(b => b.addEventListener('click', () => {
@@ -232,33 +351,137 @@ $$('nav button').forEach(b => b.addEventListener('click', () => {
   $('#tab-' + b.dataset.tab).classList.add('active');
 }));
 
-// ---- Direction segmented ----
-$$('#dirSeg button').forEach(b => b.addEventListener('click', () => {
-  $$('#dirSeg button').forEach(x => x.classList.remove('on'));
-  b.classList.add('on');
-  autoDir = b.dataset.dir;
-}));
-
-// ---- API helpers ----
+// ---- API helper ----
 async function api(path, opts) {
   try {
     const r = await fetch(path, opts);
     if (!r.ok) throw 0;
     return await r.json();
-  } catch(e) {
-    return null;
-  }
+  } catch(e) { return null; }
 }
+const post = (path, body) => api(path, {
+  method:'POST', headers:{'Content-Type':'application/json'},
+  body: body ? JSON.stringify(body) : undefined
+});
 
-// ---- Status polling ----
+/* =========================================================
+   Linear dual-thumb range
+   ========================================================= */
+const linRange = $('#linRange');
+function linPct(v){ return cfg.maxTravelMm > 0 ? (v / cfg.maxTravelMm * 100) : 0; }
+function renderLin(){
+  const a = Math.min(cfg.sStart, cfg.sEnd), b = Math.max(cfg.sStart, cfg.sEnd);
+  $('#linStart').style.left = linPct(cfg.sStart) + '%';
+  $('#linEnd').style.left   = linPct(cfg.sEnd)   + '%';
+  $('#linFill').style.left  = linPct(a) + '%';
+  $('#linFill').style.width = (linPct(b) - linPct(a)) + '%';
+  $('#sStart').value = Math.round(cfg.sStart);
+  $('#sEnd').value   = Math.round(cfg.sEnd);
+}
+function renderLinCur(){ $('#linCur').style.left = clamp(linPct(curMm),0,100) + '%'; }
+
+function dragThumb(el, key){
+  const track = linRange.querySelector('.track');
+  const move = e => {
+    const r = track.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    let v = clamp(x / r.width, 0, 1) * cfg.maxTravelMm;
+    cfg[key] = Math.round(v);
+    renderLin();
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+  };
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  });
+}
+dragThumb($('#linStart'), 'sStart');
+dragThumb($('#linEnd'), 'sEnd');
+$('#sStart').addEventListener('input', e => { cfg.sStart = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); });
+$('#sEnd').addEventListener('input',  e => { cfg.sEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); });
+
+/* =========================================================
+   Rotary dual-thumb dial
+   ========================================================= */
+const DCX=110, DCY=110, DR=82;
+function polar(ang){ // 0° at top, clockwise
+  const r = (ang - 90) * Math.PI / 180;
+  return { x: DCX + DR*Math.cos(r), y: DCY + DR*Math.sin(r) };
+}
+function angleAt(clientX, clientY){
+  const svg = $('#dial');
+  const r = svg.getBoundingClientRect();
+  // map client coords into the 220x220 viewBox space
+  const x = (clientX - r.left) / r.width * 220;
+  const y = (clientY - r.top)  / r.height * 220;
+  let a = Math.atan2(y - DCY, x - DCX) * 180 / Math.PI + 90;
+  a = (a % 360 + 360) % 360;
+  return a;
+}
+function arcPath(a0, a1){
+  const cw = a1 >= a0;
+  const sweep = Math.abs(a1 - a0);
+  const large = sweep > 180 ? 1 : 0;
+  const p0 = polar(a0), p1 = polar(a1);
+  return `M ${p0.x} ${p0.y} A ${DR} ${DR} 0 ${large} ${cw?1:0} ${p1.x} ${p1.y}`;
+}
+function renderPan(){
+  const ps = polar(cfg.pStart), pe = polar(cfg.pEnd);
+  $('#panStartH').setAttribute('cx', ps.x); $('#panStartH').setAttribute('cy', ps.y);
+  $('#panEndH').setAttribute('cx', pe.x);   $('#panEndH').setAttribute('cy', pe.y);
+  $('#panArc').setAttribute('d', arcPath(cfg.pStart, cfg.pEnd));
+  $('#pStart').value = Math.round(cfg.pStart);
+  $('#pEnd').value   = Math.round(cfg.pEnd);
+}
+function renderPanCur(){
+  const n = polar(curPan);
+  $('#panNeedle').setAttribute('x2', n.x);
+  $('#panNeedle').setAttribute('y2', n.y);
+  $('#panAngleTxt').textContent = Math.round(curPan) + '°';
+}
+function dragHandle(el, key){
+  const move = e => {
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    cfg[key] = clamp(Math.round(angleAt(cx, cy)), 0, cfg.panMaxDeg);
+    renderPan();
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+  };
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  });
+}
+dragHandle($('#panStartH'), 'pStart');
+dragHandle($('#panEndH'), 'pEnd');
+$('#pStart').addEventListener('input', e => { cfg.pStart = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); });
+$('#pEnd').addEventListener('input',  e => { cfg.pEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); });
+
+// ---- Go-to start/end buttons ----
+$$('.miniact button').forEach(b => b.addEventListener('click', () => {
+  const axis = b.dataset.axis;
+  let pos;
+  if (axis === 'slider') pos = (b.dataset.edge === 'start') ? cfg.sStart : cfg.sEnd;
+  else                   pos = (b.dataset.edge === 'start') ? cfg.pStart : cfg.pEnd;
+  post('/api/goto', { axis, pos });
+}));
+
+/* =========================================================
+   Status polling
+   ========================================================= */
 async function poll() {
   const s = await api('/api/status');
   if (!s) {
     pollFailures++;
-    if (pollFailures > 3) {
-      $('#connBadge').className = 'badge bad';
-      $('#connBadge').textContent = 'offline';
-    }
+    if (pollFailures > 3) { $('#connBadge').className='badge bad'; $('#connBadge').textContent='offline'; }
     return;
   }
   pollFailures = 0;
@@ -267,14 +490,15 @@ async function poll() {
   $('#connBadge').textContent = 'connected';
   $('#statText').textContent = s.stateText;
   $('#posVal').textContent = s.pos.toFixed(1);
-  // Progress bar: during an auto move show its completion; otherwise reflect the
-  // physical position along the rail, so the bar also moves while jogging manually.
+  $('#panVal').textContent = (s.panPos||0).toFixed(1);
+  curMm = s.pos; curPan = s.panPos || 0;
+  renderLinCur(); renderPanCur();
+
   const inAuto = s.stateRaw === 'AUTO_MOVE' || s.stateRaw === 'AUTO_REPOSITION' || s.stateRaw === 'AUTO_PAUSED';
-  let frac = inAuto ? s.progress : (maxTravelMm > 0 ? s.pos / maxTravelMm : 0);
-  frac = Math.max(0, Math.min(1, frac));
+  let frac = inAuto ? s.progress : (cfg.maxTravelMm > 0 ? s.pos / cfg.maxTravelMm : 0);
+  frac = clamp(frac, 0, 1);
   $('#progBar').style.width = (frac * 100).toFixed(1) + '%';
 
-  // External control lock (e.g. PrintLapse app took over)
   if (s.locked) {
     $('#appLockOverlay').classList.remove('hidden');
     $('#lockedByText').textContent = s.by ? ('In use by ' + s.by) : 'In use by an external app';
@@ -282,7 +506,6 @@ async function poll() {
     $('#appLockOverlay').classList.add('hidden');
   }
 
-  // Lock overlay (motion is also blocked server-side until homed)
   if (s.homed) {
     $('#lockOverlay').classList.add('hidden');
   } else {
@@ -294,66 +517,45 @@ async function poll() {
     $('#homingMsg').textContent = isHoming ? 'Finding limit switch...' : '';
   }
 
-  // Calibration spin button doubles as a Stop while spinning
+  // Stepper enable/disable toggle reflects the current hold state.
+  const mb = $('#motorsBtn');
+  mb.textContent = s.motors ? 'Disable Steppers' : 'Enable Steppers';
+  mb.classList.toggle('danger', !s.motors);
+
   const spinning = s.stateRaw === 'CALIBRATE';
   const cs = $('#calSpin');
   cs.textContent = spinning ? '⏹ Stop' : '▶ Spin';
   cs.classList.toggle('danger', spinning);
 
-  // Auto buttons swap based on state
   const st = s.stateRaw;
   const isMoving = st === 'AUTO_MOVE' || st === 'AUTO_REPOSITION';
   const isPaused = st === 'AUTO_PAUSED';
   const isActive = isMoving || isPaused;
-
   $('#autoStart').style.display  = isActive ? 'none'  : 'block';
   $('#autoPause').style.display  = isMoving ? 'block' : 'none';
   $('#autoResume').style.display = isPaused ? 'block' : 'none';
   $('#autoStop').style.display   = isActive ? 'block' : 'none';
 }
-// Self-pacing poll: wait for each status response before scheduling the next,
-// so requests never pile up while the (synchronous) server is busy stepping.
-// This keeps the position read-out fresh instead of trailing a backlog.
-const POLL_GAP = 100;   // ms between the end of one status fetch and the next
-async function pollLoop() {
-  for (;;) {
-    await poll();
-    await new Promise(r => setTimeout(r, POLL_GAP));
-  }
-}
+const POLL_GAP = 100;
+async function pollLoop(){ for(;;){ await poll(); await new Promise(r => setTimeout(r, POLL_GAP)); } }
 pollLoop();
 
 // ---- Homing ----
 $('#homeBtn').addEventListener('click', async () => {
   $('#homingMsg').textContent = 'Moving to limit switch...';
-  await api('/api/home', { method:'POST' });
+  await post('/api/home');
 });
-$('#skipHomeBtn').addEventListener('click', () => api('/api/skiphome', { method:'POST' }));
-$('#stopHomeBtn').addEventListener('click', () => api('/api/estop', { method:'POST' }));
+$('#skipHomeBtn').addEventListener('click', () => post('/api/skiphome'));
+$('#stopHomeBtn').addEventListener('click', () => post('/api/estop'));
 
-// ---- Jog speed slider ----
-$('#jogSpeed').addEventListener('input', e => {
-  $('#jogSpeedVal').textContent = parseFloat(e.target.value).toFixed(1);
-});
+// ---- Jog speed sliders ----
+$('#jogSpeed').addEventListener('input', e => $('#jogSpeedVal').textContent = parseFloat(e.target.value).toFixed(1));
+$('#panJogSpeed').addEventListener('input', e => $('#panJogSpeedVal').textContent = parseFloat(e.target.value).toFixed(0));
 
-// ---- Manual jog: press & hold ----
-function bindJog(el, dir) {
-  const start = e => {
-    e.preventDefault();
-    api('/api/manual', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'start',dir,speed:parseFloat($('#jogSpeed').value)})
-    });
-  };
-  const stop = e => {
-    e.preventDefault();
-    api('/api/manual', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'stop'})
-    });
-  };
+// ---- Manual jog: press & hold (per axis) ----
+function bindJog(el, axis, dir, speedSel) {
+  const start = e => { e.preventDefault(); post('/api/manual', {action:'start', axis, dir, speed:parseFloat($(speedSel).value)}); };
+  const stop  = e => { e.preventDefault(); post('/api/manual', {action:'stop', axis}); };
   el.addEventListener('mousedown', start);
   el.addEventListener('touchstart', start, {passive:false});
   el.addEventListener('mouseup', stop);
@@ -361,57 +563,43 @@ function bindJog(el, dir) {
   el.addEventListener('touchend', stop);
   el.addEventListener('touchcancel', stop);
 }
-bindJog($('#jogL'), 'left');
-bindJog($('#jogR'), 'right');
+bindJog($('#jogL'), 'slider', 'left',  '#jogSpeed');
+bindJog($('#jogR'), 'slider', 'right', '#jogSpeed');
+bindJog($('#jogCCW'), 'pan', 'left',  '#panJogSpeed');
+bindJog($('#jogCW'),  'pan', 'right', '#panJogSpeed');
 
-$('#estop').addEventListener('click', () => api('/api/estop', { method:'POST' }));
-$('#gotoHome').addEventListener('click', () => api('/api/goto', {
-  method:'POST',
-  headers:{'Content-Type':'application/json'},
-  body:JSON.stringify({pos:0})
-}));
+$('#estop').addEventListener('click', () => post('/api/estop'));
+$('#motorsBtn').addEventListener('click', () => post('/api/motors', { enabled: !state.motors }));
+$('#gotoHome').addEventListener('click', () => post('/api/goto', {axis:'slider', pos:0}));
+$('#rehome').addEventListener('click', () => post('/api/home'));
 
 // ---- Auto move ----
 $('#autoStart').addEventListener('click', () => {
   const dur = parseFloat($('#autoDur').value) || 10;
-  api('/api/auto', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'start', dir:autoDir, duration:dur})
+  post('/api/auto', {
+    action:'start', duration:dur,
+    sStart:cfg.sStart, sEnd:cfg.sEnd,
+    pStart:cfg.pStart, pEnd:cfg.pEnd
   });
 });
-$('#autoStop').addEventListener('click', () => {
-  api('/api/auto', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'stop'})
-  });
-});
-$('#autoPause').addEventListener('click', () => {
-  api('/api/auto', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'pause'})
-  });
-});
-$('#autoResume').addEventListener('click', () => {
-  api('/api/auto', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'resume'})
-  });
-});
+$('#autoStop').addEventListener('click',   () => post('/api/auto', {action:'stop'}));
+$('#autoPause').addEventListener('click',  () => post('/api/auto', {action:'pause'}));
+$('#autoResume').addEventListener('click', () => post('/api/auto', {action:'resume'}));
 
-// ---- Re-home from Manual page ----
-$('#rehome').addEventListener('click', () => {
-  api('/api/home', { method:'POST' });
-});
-
-// ---- Settings ----
+/* =========================================================
+   Settings
+   ========================================================= */
 async function loadSettings() {
   const s = await api('/api/settings');
   if (!s) return;
-  maxTravelMm = s.maxTravelMm;
+  cfg.maxTravelMm = s.maxTravelMm;
+  cfg.panMaxDeg   = s.panMaxDeg || 360;
+  cfg.sStart = clamp(s.startMm, 0, cfg.maxTravelMm);
+  cfg.sEnd   = clamp(s.endMm,   0, cfg.maxTravelMm);
+  cfg.pStart = clamp(s.panStartDeg, 0, cfg.panMaxDeg);
+  cfg.pEnd   = clamp(s.panEndDeg,   0, cfg.panMaxDeg);
+  renderLin(); renderPan();
+
   $('#setMmPerRev').value     = (Math.round(s.mmPerRev * 1000) / 1000);
   $('#setMaxTravel').value    = s.maxTravelMm;
   $('#setMaxSpeed').value     = s.maxSpeedMmS;
@@ -419,61 +607,57 @@ async function loadSettings() {
   $('#setHomingSpeed').value  = s.homingSpeedMmS;
   $('#setUseAccel').checked   = s.useAccel;
   $('#setInvertDir').checked  = s.invertDir;
+  $('#setPanStepsPerRev').value = s.panStepsPerRev;
+  $('#setPanMaxSpeed').value    = s.panMaxSpeedDegS;
+  $('#setPanAccel').value       = s.panAccelDegS2;
+  $('#setPanInvertDir').checked = s.panInvertDir;
 
-  // Jog speed slider: cap at max speed, keep current value if still in range.
   const js = $('#jogSpeed');
   js.max = s.maxSpeedMmS;
   if (parseFloat(js.value) > s.maxSpeedMmS) js.value = s.maxSpeedMmS;
   $('#jogSpeedVal').textContent = parseFloat(js.value).toFixed(1);
+  const pjs = $('#panJogSpeed');
+  pjs.max = s.panMaxSpeedDegS;
+  if (parseFloat(pjs.value) > s.panMaxSpeedDegS) pjs.value = s.panMaxSpeedDegS;
+  $('#panJogSpeedVal').textContent = parseFloat(pjs.value).toFixed(0);
 }
 $('#settingsSave').addEventListener('click', async () => {
-  maxTravelMm = parseFloat($('#setMaxTravel').value) || maxTravelMm;
   const payload = {
-    mmPerRev:     parseFloat($('#setMmPerRev').value),
-    maxTravelMm:  parseFloat($('#setMaxTravel').value),
-    maxSpeedMmS:  parseFloat($('#setMaxSpeed').value),
-    accelMmS2:    parseFloat($('#setAccel').value),
+    mmPerRev:       parseFloat($('#setMmPerRev').value),
+    maxTravelMm:    parseFloat($('#setMaxTravel').value),
+    maxSpeedMmS:    parseFloat($('#setMaxSpeed').value),
+    accelMmS2:      parseFloat($('#setAccel').value),
     homingSpeedMmS: parseFloat($('#setHomingSpeed').value),
-    useAccel:     $('#setUseAccel').checked,
-    invertDir:    $('#setInvertDir').checked
+    useAccel:       $('#setUseAccel').checked,
+    invertDir:      $('#setInvertDir').checked,
+    startMm:        cfg.sStart, endMm: cfg.sEnd,
+    panStepsPerRev: parseInt($('#setPanStepsPerRev').value),
+    panMaxSpeedDegS:parseFloat($('#setPanMaxSpeed').value),
+    panAccelDegS2:  parseFloat($('#setPanAccel').value),
+    panInvertDir:   $('#setPanInvertDir').checked,
+    panStartDeg:    cfg.pStart, panEndDeg: cfg.pEnd
   };
-  const r = await api('/api/settings', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
-  });
+  const r = await post('/api/settings', payload);
   $('#settingsSave').textContent = r ? 'Saved ✓' : 'Save failed';
   setTimeout(() => $('#settingsSave').textContent = 'Save Settings', 1500);
+  if (r) loadSettings();
 });
 loadSettings();
 
 // ---- Calibration ----
 $('#calSpin').addEventListener('click', async () => {
-  // While spinning, the button acts as an emergency Stop
-  if (state.stateRaw === 'CALIBRATE') {
-    await api('/api/estop', { method:'POST' });
-    $('#calMsg').textContent = 'Stopped.';
-    return;
-  }
+  if (state.stateRaw === 'CALIBRATE') { await post('/api/estop'); $('#calMsg').textContent='Stopped.'; return; }
   const turns = parseFloat($('#calTurns').value) || 0;
   if (turns <= 0) { $('#calMsg').textContent = 'Enter a turn count first.'; return; }
-  $('#calMsg').textContent = 'Spinning ' + turns + ' turn(s)... press Stop to abort. Make sure the carriage has room.';
-  const r = await api('/api/calibrate', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'spin', turns})
-  });
+  $('#calMsg').textContent = 'Spinning ' + turns + ' turn(s)... press Stop to abort.';
+  const r = await post('/api/calibrate', {action:'spin', turns});
   if (!r) $('#calMsg').textContent = 'Could not spin. Home or skip homing first, and wait until idle.';
 });
 $('#calApply').addEventListener('click', async () => {
-  const turns    = parseFloat($('#calTurns').value) || 0;
+  const turns = parseFloat($('#calTurns').value) || 0;
   const measured = parseFloat($('#calMeasured').value) || 0;
   if (turns <= 0 || measured <= 0) { $('#calMsg').textContent = 'Enter turns and measured mm first.'; return; }
-  const r = await api('/api/calibrate', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'apply', turns, measured})
-  });
+  const r = await post('/api/calibrate', {action:'apply', turns, measured});
   if (r && r.ok) {
     $('#calMsg').textContent = 'Calibrated ✓  steps/mm = ' + r.stepsPerMm.toFixed(2) + ', mm/turn = ' + r.mmPerRev.toFixed(3);
     loadSettings();
@@ -482,7 +666,7 @@ $('#calApply').addEventListener('click', async () => {
   }
 });
 
-// ---- Network (status + forget only; full setup lives on the AP page) ----
+// ---- Network ----
 async function loadWifiStatus() {
   const w = await api('/api/wifi');
   if (!w) return;
@@ -491,7 +675,7 @@ async function loadWifiStatus() {
 }
 $('#wifiForget').addEventListener('click', async () => {
   $('#wifiMsg').textContent = 'Cleared. Restarting back into CameraSlider setup AP…';
-  await api('/api/wifi/forget', { method:'POST' });
+  await post('/api/wifi/forget');
 });
 loadWifiStatus();
 </script>

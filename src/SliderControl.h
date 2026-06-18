@@ -16,40 +16,61 @@ enum SliderState {
 };
 
 enum Direction {
-    DIR_LEFT  = -1,
-    DIR_RIGHT =  1
+    DIR_LEFT  = -1,         // toward 0 (slider: left, pan: CCW)
+    DIR_RIGHT =  1          // toward max (slider: right, pan: CW)
+};
+
+// Motion axes. AXIS_SLIDER is the linear rail (units = mm); AXIS_PAN is the
+// rotary platform on top of it (units = degrees, 0..360).
+enum AxisId {
+    AXIS_SLIDER = 0,
+    AXIS_PAN    = 1,
+    AXIS_COUNT  = 2
 };
 
 void Slider_begin();
 void Slider_update();           // call frequently from loop()
 
 // ---- Commands ----
-bool Slider_startHoming();
-void Slider_skipHoming();       // skip homing: treat current position as 0, unlock movement
-void Slider_stop();             // soft stop (use after manual release)
-void Slider_emergencyStop();
+bool Slider_startHoming();       // homes the linear axis (pan unaffected)
+void Slider_skipHoming();        // skip homing: treat current positions as 0, unlock movement
+void Slider_stop();              // soft stop (use after manual release)
+void Slider_emergencyStop();     // stop all motion immediately
 
-// Calibration: spin a fixed number of steps (signed), then return to idle
+// Calibration: spin the linear axis a fixed number of steps (signed), then idle
 bool Slider_calibrateSpin(long steps);
 
-bool Slider_manualStart(Direction d, float speedMmS);   // press (jog at speedMmS)
-void Slider_manualStop();                               // release
+// Motor power. Motors are held energized by default (even when idle) so they
+// resist being back-driven. Disable releases the coils (only allowed when not
+// moving); any new motion command re-enables and re-arms the "hold" behaviour.
+bool Slider_setMotorsEnabled(bool enabled);
+bool Slider_motorsEnabled();
 
-// Absolute move to a millimetre position (0..maxTravel). Non-blocking; returns
-// true if accepted. Used by /api/goto (external apps + "go to home").
+// Per-axis manual jog. speed is in the axis's own units/s (mm/s or deg/s).
+bool Slider_manualStart(AxisId axis, Direction d, float speed);
+void Slider_manualStop(AxisId axis);
+
+// Absolute move of one axis to a position in its own units (mm or deg).
+// Non-blocking; returns true if accepted.
+bool Slider_gotoPos(AxisId axis, float pos);
+// Convenience wrapper kept for external apps (PrintLapse): linear axis only.
 bool Slider_gotoMm(float mm);
 
-// Auto move: direction = "ltr" (0 -> max) or "rtl" (max -> 0), duration in seconds
-bool Slider_startAuto(bool leftToRight, float durationSec);
+// Auto move: both axes travel from their configured start->end position
+// (settings.startMm/endMm and settings.panStartDeg/panEndDeg) simultaneously,
+// completing together in roughly durationSec seconds.
+bool Slider_startAuto(float durationSec);
 void Slider_stopAuto();
 bool Slider_pauseAuto();
 bool Slider_resumeAuto();
 
 // ---- Status getters ----
 SliderState Slider_state();
-float       Slider_positionMm();
+float       Slider_position(AxisId axis);   // current position in axis units
+float       Slider_positionMm();            // == Slider_position(AXIS_SLIDER)
+float       Slider_axisMax(AxisId axis);    // usable range max (maxTravelMm / 360)
 bool        Slider_isHomed();
-float       Slider_autoProgress();      // 0..1 during auto move
+float       Slider_autoProgress();          // 0..1 during auto move
 const char* Slider_stateText();
 
 // ---- Settings refresh (after EEPROM save) ----

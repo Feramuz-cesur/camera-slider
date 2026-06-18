@@ -78,8 +78,10 @@ static void handleStatus() {
     doc["state"]     = stateApiName(Slider_state());    // contract: idle|homing|moving|error|estop
     doc["stateRaw"]  = stateShortName(Slider_state());  // detailed token for our own UI
     doc["stateText"] = Slider_stateText();
-    doc["pos"]       = Slider_positionMm();
+    doc["pos"]       = Slider_positionMm();             // slider mm (PrintLapse contract)
+    doc["panPos"]    = Slider_position(AXIS_PAN);        // pan degrees
     doc["homed"]     = Slider_isHomed();
+    doc["motors"]    = Slider_motorsEnabled();
     doc["progress"]  = Slider_autoProgress();
     doc["locked"]    = g_locked;
     doc["by"]        = g_lockedBy;
@@ -103,14 +105,17 @@ static void handleManual() {
     DeserializationError err = deserializeJson(doc, server.arg("plain"));
     if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
     const char* action = doc["action"] | "";
+    const char* axisStr = doc["axis"] | "slider";
+    AxisId axis = (strcmp(axisStr, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
     if (strcmp(action, "start") == 0) {
         if (g_locked) { server.send(409, "application/json", "{\"ok\":false}"); return; }
         const char* dir = doc["dir"] | "";
-        float speed = doc["speed"] | settings.maxSpeedMmS;   // jog speed (mm/s)
-        bool ok = Slider_manualStart(strcmp(dir, "right") == 0 ? DIR_RIGHT : DIR_LEFT, speed);
+        float defSpeed = (axis == AXIS_PAN) ? settings.panMaxSpeedDegS : settings.maxSpeedMmS;
+        float speed = doc["speed"] | defSpeed;   // jog speed in axis units/s
+        bool ok = Slider_manualStart(axis, strcmp(dir, "right") == 0 ? DIR_RIGHT : DIR_LEFT, speed);
         server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
     } else if (strcmp(action, "stop") == 0) {
-        Slider_manualStop();
+        Slider_manualStop(axis);
         server.send(200, "application/json", "{\"ok\":true}");
     } else {
         server.send(400, "application/json", "{\"ok\":false}");
@@ -124,10 +129,28 @@ static void handleAuto() {
     const char* action = doc["action"] | "";
     if (strcmp(action, "start") == 0) {
         if (g_locked) { server.send(409, "application/json", "{\"ok\":false}"); return; }
-        const char* dir   = doc["dir"]      | "ltr";
-        float duration    = doc["duration"] | 10.0f;
-        bool ltr = (strcmp(dir, "ltr") == 0);
-        bool ok = Slider_startAuto(ltr, duration);
+        float duration = doc["duration"] | 10.0f;
+
+        // Optional per-axis start/end overrides. When present we persist them so
+        // the move (and future runs) use exactly what the UI shows.
+        bool changed = false;
+        if (doc["sStart"].is<float>() || doc["sEnd"].is<float>()) {
+            float a = doc["sStart"] | settings.startMm;
+            float b = doc["sEnd"]   | settings.endMm;
+            a = constrain(a, 0.0f, settings.maxTravelMm);
+            b = constrain(b, 0.0f, settings.maxTravelMm);
+            settings.startMm = a; settings.endMm = b; changed = true;
+        }
+        if (doc["pStart"].is<float>() || doc["pEnd"].is<float>()) {
+            float a = doc["pStart"] | settings.panStartDeg;
+            float b = doc["pEnd"]   | settings.panEndDeg;
+            a = constrain(a, 0.0f, DEFAULT_PAN_MAX_DEG);
+            b = constrain(b, 0.0f, DEFAULT_PAN_MAX_DEG);
+            settings.panStartDeg = a; settings.panEndDeg = b; changed = true;
+        }
+        if (changed) Settings_save();
+
+        bool ok = Slider_startAuto(duration);
         server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
     } else if (strcmp(action, "stop") == 0) {
         Slider_stopAuto();
@@ -148,13 +171,30 @@ static void handleEstop() {
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
+static void handleMotors() {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, server.arg("plain"));
+    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+    bool enabled = doc["enabled"] | true;
+    bool ok = Slider_setMotorsEnabled(enabled);
+    JsonDocument res;
+    res["ok"]      = ok;
+    res["enabled"] = Slider_motorsEnabled();
+    String out;
+    serializeJson(res, out);
+    server.send(ok ? 200 : 409, "application/json", out);
+}
+
 static void handleGoto() {
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, server.arg("plain"));
     if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
     float pos = doc["pos"] | 0.0f;
+    // axis defaults to the linear slider (PrintLapse contract: pos in mm).
+    const char* axisStr = doc["axis"] | "slider";
+    AxisId axis = (strcmp(axisStr, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
     // Accept and return immediately; the move runs in the background (contract).
-    bool ok = Slider_gotoMm(pos);
+    bool ok = Slider_gotoPos(axis, pos);
     server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
@@ -169,6 +209,16 @@ static void handleSettingsGet() {
     doc["homingSpeedMmS"] = settings.homingSpeedMmS;
     doc["useAccel"]    = settings.useAccel;
     doc["invertDir"]   = settings.invertDir;
+    doc["startMm"]     = settings.startMm;
+    doc["endMm"]       = settings.endMm;
+    // Axis 2 (rotary pan)
+    doc["panStepsPerRev"]  = settings.panStepsPerRev;
+    doc["panMaxSpeedDegS"] = settings.panMaxSpeedDegS;
+    doc["panAccelDegS2"]   = settings.panAccelDegS2;
+    doc["panInvertDir"]    = settings.panInvertDir;
+    doc["panStartDeg"]     = settings.panStartDeg;
+    doc["panEndDeg"]       = settings.panEndDeg;
+    doc["panMaxDeg"]       = DEFAULT_PAN_MAX_DEG;
     String out;
     serializeJson(doc, out);
     server.send(200, "application/json", out);
@@ -188,6 +238,15 @@ static void handleSettingsPost() {
     float    homingSpeed = doc["homingSpeedMmS"] | settings.homingSpeedMmS;
     bool     useAccel    = doc["useAccel"]    | settings.useAccel;
     bool     invertDir   = doc["invertDir"]   | settings.invertDir;
+    float    startMm     = doc["startMm"]     | settings.startMm;
+    float    endMm       = doc["endMm"]       | settings.endMm;
+
+    uint16_t panStepsPerRev  = doc["panStepsPerRev"]  | settings.panStepsPerRev;
+    float    panMaxSpeedDegS = doc["panMaxSpeedDegS"] | settings.panMaxSpeedDegS;
+    float    panAccelDegS2   = doc["panAccelDegS2"]   | settings.panAccelDegS2;
+    bool     panInvertDir    = doc["panInvertDir"]    | settings.panInvertDir;
+    float    panStartDeg     = doc["panStartDeg"]     | settings.panStartDeg;
+    float    panEndDeg       = doc["panEndDeg"]       | settings.panEndDeg;
 
     if (mmPerRev    < 0.1f || mmPerRev    > 1000) { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (stepsPerRev < 1    || stepsPerRev > 20000){ server.send(400, "application/json", "{\"ok\":false}"); return; }
@@ -197,6 +256,9 @@ static void handleSettingsPost() {
     if (maxSpeedMmS < 1 || maxSpeedMmS > 500)   { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (accelMmS2   < 1 || accelMmS2   > 5000)  { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (homingSpeed < 1 || homingSpeed > 500)   { server.send(400, "application/json", "{\"ok\":false}"); return; }
+    if (panStepsPerRev < 1 || panStepsPerRev > 60000) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+    if (panMaxSpeedDegS < 1 || panMaxSpeedDegS > 2000) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+    if (panAccelDegS2   < 1 || panAccelDegS2   > 10000){ server.send(400, "application/json", "{\"ok\":false}"); return; }
 
     settings.stepsPerMm  = stepsPerMm;
     settings.stepsPerRev = stepsPerRev;
@@ -206,6 +268,14 @@ static void handleSettingsPost() {
     settings.homingSpeedMmS = homingSpeed;
     settings.useAccel    = useAccel;
     settings.invertDir   = invertDir;
+    settings.startMm     = constrain(startMm, 0.0f, maxTravelMm);
+    settings.endMm       = constrain(endMm,   0.0f, maxTravelMm);
+    settings.panStepsPerRev  = panStepsPerRev;
+    settings.panMaxSpeedDegS = panMaxSpeedDegS;
+    settings.panAccelDegS2   = panAccelDegS2;
+    settings.panInvertDir    = panInvertDir;
+    settings.panStartDeg     = constrain(panStartDeg, 0.0f, DEFAULT_PAN_MAX_DEG);
+    settings.panEndDeg       = constrain(panEndDeg,   0.0f, DEFAULT_PAN_MAX_DEG);
     Settings_save();
     Slider_applySettings();
     server.send(200, "application/json", "{\"ok\":true}");
@@ -330,6 +400,7 @@ void Web_begin() {
     server.on("/api/manual",    HTTP_POST, handleManual);
     server.on("/api/auto",      HTTP_POST, handleAuto);
     server.on("/api/estop",     HTTP_POST, handleEstop);
+    server.on("/api/motors",    HTTP_POST, handleMotors);
     server.on("/api/goto",      HTTP_POST, handleGoto);
     server.on("/api/lock",      HTTP_POST, handleLock);
     server.on("/api/settings",  HTTP_GET,  handleSettingsGet);

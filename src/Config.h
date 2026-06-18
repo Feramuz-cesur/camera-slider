@@ -6,19 +6,29 @@
 // (no strapping / flash / USB involvement). EN on the A4988 is active-LOW.
 // Wire A4988: STEP, DIR, ENABLE, plus MS1/MS2/MS3 (set by jumpers for the
 // microstep mode — see DRIVER_MICROSTEP below), RESET tied to SLEEP (both HIGH).
-#define PIN_STEP        0   // GPIO0  -> A4988 STEP
-#define PIN_DIR         1   // GPIO1  -> A4988 DIR
-#define PIN_EN          3   // GPIO3  -> A4988 ENABLE (active LOW)
-// GPIO10 is now free (was ULN2003 IN4 on the old 28BYJ-48 setup).
+// ---- Axis 1: Linear slider (A4988 #1, NEMA 17 + GT2 belt) ----
+#define PIN_STEP        0   // GPIO0  -> A4988 #1 STEP
+#define PIN_DIR         1   // GPIO1  -> A4988 #1 DIR
+#define PIN_EN          3   // GPIO3  -> A4988 #1 ENABLE (active LOW)
+#define PIN_LIMIT       4   // GPIO4  -> Slider limit switch (to GND when triggered)
 
-#define PIN_LIMIT       4   // GPIO4  -> Limit Switch (to GND when triggered)
+// ---- Axis 2: Rotary pan (A4988 #2). 360° platform on top of the slider. ----
+// GPIO20/21 are UART0 by default, but Serial runs over native USB-CDC here
+// (ARDUINO_USB_CDC_ON_BOOT=1), so they are free for general use.
+#define PIN_STEP2       7   // GPIO7  -> A4988 #2 STEP
+#define PIN_DIR2        10  // GPIO10 -> A4988 #2 DIR  (was ULN2003 IN4 on the old setup)
+#define PIN_EN2         20  // GPIO20 -> A4988 #2 ENABLE (active LOW)
+#define PIN_LIMIT2      21  // GPIO21 -> Pan limit switch (optional/reserved; INPUT_PULLUP)
+// Set PAN_HAS_LIMIT to 1 once a switch is wired to PIN_LIMIT2 and you want
+// the pan axis to home against it. Left 0 = pan treats power-on as 0°.
+#define PAN_HAS_LIMIT   0
 
 // Onboard 0.42" OLED (SSD1306 72x40, I2C addr 0x3C) — fixed by the board.
 #define PIN_OLED_SDA    5   // GPIO5
 #define PIN_OLED_SCL    6   // GPIO6
 
 // Avoid: GPIO2 (strapping, WS2812 on some revisions), GPIO8/9 (strapping/BOOT
-// button), GPIO20/21 (UART0).
+// button), GPIO18/19 (native USB D-/D+), GPIO11-17 (internal flash).
 
 // ---------- Homing Behavior ----------
 // Fast approach speed toward the switch is user-configurable (settings.homingSpeedMmS);
@@ -51,6 +61,22 @@
 #define DEFAULT_HOMING_SPEED_MMS 10.0f   // approach speed toward the limit switch
 #define DEFAULT_USE_ACCEL       true
 #define DEFAULT_INVERT_DIR      false
+
+// Auto-move start/end for the linear axis (mm). Defaults span the full rail.
+#define DEFAULT_START_MM        0.0f
+#define DEFAULT_END_MM          DEFAULT_MAX_TRAVEL_MM
+
+// ---------- Axis 2: Rotary pan defaults ----------
+// Steps for one full 360° turn of the camera platform. Direct drive on a
+// 1.8° NEMA 17 at 1/16 microstep = 3200; increase for a geared head and
+// calibrate from the web UI. steps/deg = panStepsPerRev / 360.
+#define DEFAULT_PAN_STEPS_PER_REV (MOTOR_FULL_STEPS_PER_REV * DRIVER_MICROSTEP)  // 3200
+#define DEFAULT_PAN_MAX_DEG       360.0f   // usable rotation range
+#define DEFAULT_PAN_MAX_SPEED_DEGS 90.0f   // deg/s upper limit
+#define DEFAULT_PAN_ACCEL_DEGS2    180.0f  // deg/s^2
+#define DEFAULT_PAN_INVERT_DIR     false
+#define DEFAULT_PAN_START_DEG      0.0f
+#define DEFAULT_PAN_END_DEG        360.0f
 
 // ---------- Misc ----------
 #define STATUS_UPDATE_MS        150
