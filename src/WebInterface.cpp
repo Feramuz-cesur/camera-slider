@@ -150,7 +150,9 @@ static void handleAuto() {
         }
         if (changed) Settings_save();
 
-        bool ok = Slider_startAuto(duration);
+        bool enLin = doc["enLin"] | true;   // include the linear axis in the move
+        bool enRot = doc["enRot"] | true;   // include the rotary axis in the move
+        bool ok = Slider_startAuto(duration, enLin, enRot);
         server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
     } else if (strcmp(action, "stop") == 0) {
         Slider_stopAuto();
@@ -195,6 +197,17 @@ static void handleGoto() {
     AxisId axis = (strcmp(axisStr, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
     // Accept and return immediately; the move runs in the background (contract).
     bool ok = Slider_gotoPos(axis, pos);
+    server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
+}
+
+static void handleSetZero() {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, server.arg("plain"));
+    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+    if (g_locked) { server.send(409, "application/json", "{\"ok\":false}"); return; }
+    const char* axisStr = doc["axis"] | "slider";
+    AxisId axis = (strcmp(axisStr, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
+    bool ok = Slider_setZero(axis);
     server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
@@ -402,6 +415,7 @@ void Web_begin() {
     server.on("/api/estop",     HTTP_POST, handleEstop);
     server.on("/api/motors",    HTTP_POST, handleMotors);
     server.on("/api/goto",      HTTP_POST, handleGoto);
+    server.on("/api/setzero",   HTTP_POST, handleSetZero);
     server.on("/api/lock",      HTTP_POST, handleLock);
     server.on("/api/settings",  HTTP_GET,  handleSettingsGet);
     server.on("/api/settings",  HTTP_POST, handleSettingsPost);

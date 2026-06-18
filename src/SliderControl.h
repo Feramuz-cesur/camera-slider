@@ -50,6 +50,10 @@ bool Slider_motorsEnabled();
 bool Slider_manualStart(AxisId axis, Direction d, float speed);
 void Slider_manualStop(AxisId axis);
 
+// Define the axis's current physical position as its new zero (origin) without
+// moving. Accepting the slider's zero also unlocks movement (counts as homed).
+bool Slider_setZero(AxisId axis);
+
 // Absolute move of one axis to a position in its own units (mm or deg).
 // Non-blocking; returns true if accepted.
 bool Slider_gotoPos(AxisId axis, float pos);
@@ -59,7 +63,7 @@ bool Slider_gotoMm(float mm);
 // Auto move: both axes travel from their configured start->end position
 // (settings.startMm/endMm and settings.panStartDeg/panEndDeg) simultaneously,
 // completing together in roughly durationSec seconds.
-bool Slider_startAuto(float durationSec);
+bool Slider_startAuto(float durationSec, bool moveLin = true, bool moveRot = true);
 void Slider_stopAuto();
 bool Slider_pauseAuto();
 bool Slider_resumeAuto();

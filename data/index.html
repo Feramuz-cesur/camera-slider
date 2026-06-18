@@ -43,15 +43,13 @@
   .card h2 .axistag{float:right;font-size:11px;padding:1px 8px;border-radius:999px;letter-spacing:.4px}
   .axistag.lin{background:#13314f;color:#9fd0ff}
   .axistag.rot{background:#2c1f47;color:#cdb0ff}
-  .jog{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .jog button{padding:24px 0;font-size:17px;font-weight:600;border-radius:10px;border:1px solid var(--line);
-    background:#1d2230;color:var(--text);cursor:pointer;touch-action:manipulation}
-  .jog button:active{background:var(--accent2)}
-  .jog.rot button:active{background:var(--pan2)}
   .btn{display:block;width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);
     background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer;margin-top:8px}
   .btn.secondary{background:#1d2230;color:var(--text)}
   .btn.danger{background:var(--bad)}
+  .btn.motorsbtn{background:var(--warn);color:#160f02;font-weight:700;font-size:15px;
+    padding:16px;box-shadow:0 2px 10px rgba(255,184,77,.25)}
+  .btn.motorsbtn.off{background:var(--bad);color:#fff;box-shadow:0 2px 10px rgba(255,93,108,.3)}
   .btn:disabled{opacity:.5;cursor:not-allowed}
   .field{display:flex;justify-content:space-between;align-items:center;margin:10px 0}
   .field label{color:var(--muted);font-size:13px}
@@ -84,10 +82,25 @@
   .rangefields .rf span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .rangefields .rf input{background:#0f1218;border:1px solid var(--line);color:var(--text);
     padding:9px 10px;border-radius:8px;font:inherit;text-align:center;width:100%}
-  .miniact{display:flex;gap:8px;margin-top:10px}
+  .miniact{display:flex;gap:8px;margin-top:8px}
   .miniact button{flex:1;background:#1d2230;border:1px solid var(--line);color:var(--text);
-    padding:9px 0;border-radius:8px;font:inherit;font-size:12px;cursor:pointer}
+    padding:11px 0;border-radius:8px;font:inherit;font-size:12px;cursor:pointer;
+    touch-action:manipulation;-webkit-user-select:none;user-select:none}
   .miniact button:active{background:var(--accent2)}
+  .miniact button.jogbtn{font-weight:600}
+  .miniact.rot button.jogbtn:active{background:var(--pan2)}
+  .miniact button.zero{background:#161b27;color:var(--muted)}
+  .miniact button.zero:active{background:var(--accent2);color:#fff}
+
+  /* ---- Toggle switch (settings) ---- */
+  .switch{position:relative;display:inline-block;width:46px;height:26px;flex:none}
+  .switch input{position:absolute;opacity:0;width:0;height:0;margin:0}
+  .switch .track{position:absolute;inset:0;background:#2a3040;border:1px solid var(--line);
+    border-radius:999px;transition:background .2s,border-color .2s;cursor:pointer}
+  .switch .track::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;
+    background:var(--muted);border-radius:50%;transition:transform .2s,background .2s}
+  .switch input:checked + .track{background:var(--accent2);border-color:var(--accent)}
+  .switch input:checked + .track::before{transform:translateX(20px);background:#fff}
 
   /* ---- Rotary dial ---- */
   .dialwrap{display:flex;justify-content:center;margin:6px 0 4px}
@@ -128,54 +141,13 @@
 </div>
 
 <nav>
-  <button data-tab="manual" class="active">Manual</button>
-  <button data-tab="auto">Auto</button>
+  <button data-tab="auto" class="active">Auto</button>
   <button data-tab="settings">Settings</button>
 </nav>
 
 <main>
 
-  <section id="tab-manual" class="active">
-    <div class="card">
-      <h2>Slider Jog <span class="axistag lin">LINEAR</span></h2>
-      <div class="jog">
-        <button id="jogL">&#9664;  LEFT</button>
-        <button id="jogR">RIGHT  &#9654;</button>
-      </div>
-      <div class="slider">
-        <div class="slider-head">
-          <span class="label">Jog speed</span>
-          <span class="val"><span id="jogSpeedVal">30</span> mm/s</span>
-        </div>
-        <input type="range" id="jogSpeed" min="0" max="60" step="0.5" value="30">
-      </div>
-    </div>
-    <div class="card">
-      <h2>Pan Jog <span class="axistag rot">ROTARY</span></h2>
-      <div class="jog rot">
-        <button id="jogCCW">&#8634;  CCW</button>
-        <button id="jogCW">CW  &#8635;</button>
-      </div>
-      <div class="slider">
-        <div class="slider-head">
-          <span class="label">Jog speed</span>
-          <span class="val"><span id="panJogSpeedVal">45</span> &deg;/s</span>
-        </div>
-        <input type="range" id="panJogSpeed" min="0" max="180" step="1" value="45">
-      </div>
-      <p class="hint">Press and hold to move. Release to stop.</p>
-    </div>
-    <div class="card">
-      <h2>Quick Actions</h2>
-      <button class="btn secondary" id="gotoHome">Go to Home (0 mm)</button>
-      <button class="btn secondary" id="rehome">Re-Home Slider</button>
-      <button class="btn secondary" id="motorsBtn">Disable Steppers</button>
-      <button class="btn danger" id="estop">Emergency Stop</button>
-      <p class="hint">Steppers stay energized (holding torque) by default. Disable to release them so the rig can be moved by hand; any move re-enables them.</p>
-    </div>
-  </section>
-
-  <section id="tab-auto">
+  <section id="tab-auto" class="active">
     <div class="card">
       <h2>Slider Path <span class="axistag lin">LINEAR</span></h2>
       <div class="range2" id="linRange">
@@ -193,6 +165,14 @@
         <button data-axis="slider" data-edge="start">Go to start</button>
         <button data-axis="slider" data-edge="end">Go to end</button>
       </div>
+      <div class="miniact">
+        <button class="jogbtn" data-jog="slider" data-dir="left">&#9664; Left</button>
+        <button class="jogbtn" data-jog="slider" data-dir="right">Right &#9654;</button>
+      </div>
+      <div class="miniact">
+        <button class="zero" data-zero="accept" data-axis="slider">Accept zero</button>
+        <button class="zero" data-zero="go" data-axis="slider">Go zero</button>
+      </div>
     </div>
 
     <div class="card">
@@ -201,7 +181,7 @@
         <svg id="dial" class="dial" width="220" height="220" viewBox="0 0 220 220">
           <circle class="ring" cx="110" cy="110" r="82"></circle>
           <path class="arc" id="panArc"></path>
-          <line class="needle" id="panNeedle" x1="110" y1="110" x2="110" y2="36"></line>
+          <line class="needle" id="panNeedle" x1="110" y1="110" x2="110" y2="192"></line>
           <circle class="center" cx="110" cy="110" r="3"></circle>
           <text id="panAngleTxt" class="big" x="110" y="150" text-anchor="middle">0°</text>
           <circle class="handle start" id="panStartH" r="11" data-key="pStart"></circle>
@@ -216,6 +196,13 @@
         <button data-axis="pan" data-edge="start">Go to start</button>
         <button data-axis="pan" data-edge="end">Go to end</button>
       </div>
+      <div class="miniact rot">
+        <button class="jogbtn" data-jog="pan" data-dir="left">&#8634; CCW</button>
+        <button class="jogbtn" data-jog="pan" data-dir="right">CW &#8635;</button>
+      </div>
+      <div class="miniact">
+        <button class="zero" data-zero="accept" data-axis="pan">Accept zero</button>
+      </div>
     </div>
 
     <div class="card">
@@ -224,12 +211,31 @@
         <label>Travel time</label>
         <input type="number" id="autoDur" min="1" max="3600" step="1" value="20">
       </div>
-      <p class="small">seconds &mdash; both axes go from start to end together, finishing at the same time.</p>
+      <p class="small">seconds &mdash; enabled axes go from start to end together, finishing at the same time.</p>
+    </div>
+    <div class="card">
+      <h2>Axes in move</h2>
+      <div class="field">
+        <label for="enLinear">Linear (slider)</label>
+        <label class="switch"><input type="checkbox" id="enLinear" checked><span class="track"></span></label>
+      </div>
+      <div class="field">
+        <label for="enRotary">Rotary (pan)</label>
+        <label class="switch"><input type="checkbox" id="enRotary" checked><span class="track"></span></label>
+      </div>
+      <p class="small">Turn an axis off to leave it out of the move. Both off disables Start.</p>
     </div>
     <button class="btn" id="autoStart">Start Move</button>
     <button class="btn secondary" id="autoPause" style="display:none">Pause</button>
     <button class="btn" id="autoResume" style="display:none">Resume</button>
     <button class="btn danger" id="autoStop" style="display:none">Stop</button>
+
+    <div class="card" style="margin-top:12px">
+      <h2>Quick Actions</h2>
+      <button class="btn motorsbtn" id="motorsBtn">Disable Steppers</button>
+      <button class="btn secondary" id="rehome">Re-Home Slider</button>
+      <p class="hint">Steppers stay energized (holding torque) by default. Disable to release them so the rig can be moved by hand; any move re-enables them. Use the per-axis Left/Right to jog (press &amp; hold), Accept zero to set the current spot as 0, Go zero to return.</p>
+    </div>
   </section>
 
   <section id="tab-settings">
@@ -244,8 +250,8 @@
         <input type="number" id="setMaxTravel" min="10" max="2000" step="1">
       </div>
       <div class="field">
-        <label>Flip direction</label>
-        <input type="checkbox" id="setInvertDir">
+        <label for="setInvertDir">Flip direction</label>
+        <label class="switch"><input type="checkbox" id="setInvertDir"><span class="track"></span></label>
       </div>
       <p class="small">mm the carriage travels per full motor turn. Flip direction if LEFT/RIGHT or homing run the wrong way.</p>
     </div>
@@ -260,8 +266,8 @@
         <input type="number" id="setAccel" min="1" max="5000" step="1">
       </div>
       <div class="field">
-        <label>Smooth ramping</label>
-        <input type="checkbox" id="setUseAccel">
+        <label for="setUseAccel">Smooth ramping</label>
+        <label class="switch"><input type="checkbox" id="setUseAccel"><span class="track"></span></label>
       </div>
       <div class="field">
         <label>Homing speed (mm/s)</label>
@@ -283,8 +289,8 @@
         <input type="number" id="setPanAccel" min="1" max="10000" step="1">
       </div>
       <div class="field">
-        <label>Flip direction</label>
-        <input type="checkbox" id="setPanInvertDir">
+        <label for="setPanInvertDir">Flip direction</label>
+        <label class="switch"><input type="checkbox" id="setPanInvertDir"><span class="track"></span></label>
       </div>
       <p class="small">Steps for one full platform turn. Direct drive on a 1/16 NEMA 17 = 3200; raise it for a geared head.</p>
     </div>
@@ -340,7 +346,8 @@ let state = { homed:false, state:'?', pos:0, panPos:0, progress:0 };
 let pollFailures = 0;
 
 // Geometry / shot config, seeded from /api/settings.
-let cfg = { maxTravelMm:300, panMaxDeg:360, sStart:0, sEnd:300, pStart:0, pEnd:360 };
+let cfg = { maxTravelMm:300, panMaxDeg:360, sStart:0, sEnd:300, pStart:0, pEnd:360,
+            maxSpeedMmS:50, panMaxSpeedDegS:90 };
 let curMm = 0, curPan = 0;
 
 // ---- Tab switching ----
@@ -408,8 +415,8 @@ $('#sEnd').addEventListener('input',  e => { cfg.sEnd   = clamp(parseFloat(e.tar
    Rotary dual-thumb dial
    ========================================================= */
 const DCX=110, DCY=110, DR=82;
-function polar(ang){ // 0° at top, clockwise
-  const r = (ang - 90) * Math.PI / 180;
+function polar(ang){ // 0° at bottom, clockwise (dial flipped 180°)
+  const r = (ang + 90) * Math.PI / 180;
   return { x: DCX + DR*Math.cos(r), y: DCY + DR*Math.sin(r) };
 }
 function angleAt(clientX, clientY){
@@ -418,7 +425,7 @@ function angleAt(clientX, clientY){
   // map client coords into the 220x220 viewBox space
   const x = (clientX - r.left) / r.width * 220;
   const y = (clientY - r.top)  / r.height * 220;
-  let a = Math.atan2(y - DCY, x - DCX) * 180 / Math.PI + 90;
+  let a = Math.atan2(y - DCY, x - DCX) * 180 / Math.PI - 90;
   a = (a % 360 + 360) % 360;
   return a;
 }
@@ -466,13 +473,36 @@ $('#pStart').addEventListener('input', e => { cfg.pStart = clamp(parseFloat(e.ta
 $('#pEnd').addEventListener('input',  e => { cfg.pEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); });
 
 // ---- Go-to start/end buttons ----
-$$('.miniact button').forEach(b => b.addEventListener('click', () => {
+$$('.miniact button[data-edge]').forEach(b => b.addEventListener('click', () => {
   const axis = b.dataset.axis;
   let pos;
   if (axis === 'slider') pos = (b.dataset.edge === 'start') ? cfg.sStart : cfg.sEnd;
   else                   pos = (b.dataset.edge === 'start') ? cfg.pStart : cfg.pEnd;
   post('/api/goto', { axis, pos });
 }));
+
+// ---- Accept zero (set current as origin) / Go zero ----
+$$('.miniact button[data-zero]').forEach(b => b.addEventListener('click', () => {
+  const axis = b.dataset.axis;
+  if (b.dataset.zero === 'go') post('/api/goto', { axis, pos:0 });
+  else                         post('/api/setzero', { axis });
+}));
+
+// ---- Per-axis jog: press & hold (Left/Right under each path) ----
+const JOG_SPEED = { slider:30, pan:45 };   // axis units/s; clamped to the axis max
+function bindJog(el, axis, dir) {
+  const speed = () => Math.min(JOG_SPEED[axis],
+    axis === 'pan' ? cfg.panMaxSpeedDegS : cfg.maxSpeedMmS);
+  const start = e => { e.preventDefault(); post('/api/manual', {action:'start', axis, dir, speed:speed()}); };
+  const stop  = e => { e.preventDefault(); post('/api/manual', {action:'stop', axis}); };
+  el.addEventListener('mousedown', start);
+  el.addEventListener('touchstart', start, {passive:false});
+  el.addEventListener('mouseup', stop);
+  el.addEventListener('mouseleave', stop);
+  el.addEventListener('touchend', stop);
+  el.addEventListener('touchcancel', stop);
+}
+$$('.jogbtn').forEach(b => bindJog(b, b.dataset.jog, b.dataset.dir));
 
 /* =========================================================
    Status polling
@@ -520,7 +550,7 @@ async function poll() {
   // Stepper enable/disable toggle reflects the current hold state.
   const mb = $('#motorsBtn');
   mb.textContent = s.motors ? 'Disable Steppers' : 'Enable Steppers';
-  mb.classList.toggle('danger', !s.motors);
+  mb.classList.toggle('off', !s.motors);
 
   const spinning = s.stateRaw === 'CALIBRATE';
   const cs = $('#calSpin');
@@ -548,36 +578,24 @@ $('#homeBtn').addEventListener('click', async () => {
 $('#skipHomeBtn').addEventListener('click', () => post('/api/skiphome'));
 $('#stopHomeBtn').addEventListener('click', () => post('/api/estop'));
 
-// ---- Jog speed sliders ----
-$('#jogSpeed').addEventListener('input', e => $('#jogSpeedVal').textContent = parseFloat(e.target.value).toFixed(1));
-$('#panJogSpeed').addEventListener('input', e => $('#panJogSpeedVal').textContent = parseFloat(e.target.value).toFixed(0));
-
-// ---- Manual jog: press & hold (per axis) ----
-function bindJog(el, axis, dir, speedSel) {
-  const start = e => { e.preventDefault(); post('/api/manual', {action:'start', axis, dir, speed:parseFloat($(speedSel).value)}); };
-  const stop  = e => { e.preventDefault(); post('/api/manual', {action:'stop', axis}); };
-  el.addEventListener('mousedown', start);
-  el.addEventListener('touchstart', start, {passive:false});
-  el.addEventListener('mouseup', stop);
-  el.addEventListener('mouseleave', stop);
-  el.addEventListener('touchend', stop);
-  el.addEventListener('touchcancel', stop);
-}
-bindJog($('#jogL'), 'slider', 'left',  '#jogSpeed');
-bindJog($('#jogR'), 'slider', 'right', '#jogSpeed');
-bindJog($('#jogCCW'), 'pan', 'left',  '#panJogSpeed');
-bindJog($('#jogCW'),  'pan', 'right', '#panJogSpeed');
-
-$('#estop').addEventListener('click', () => post('/api/estop'));
 $('#motorsBtn').addEventListener('click', () => post('/api/motors', { enabled: !state.motors }));
-$('#gotoHome').addEventListener('click', () => post('/api/goto', {axis:'slider', pos:0}));
 $('#rehome').addEventListener('click', () => post('/api/home'));
 
 // ---- Auto move ----
+// Per-axis enable toggles: leave an axis out of the move, and disable Start
+// when neither axis is selected.
+function updateAxisEnable(){
+  $('#autoStart').disabled = !($('#enLinear').checked || $('#enRotary').checked);
+}
+$('#enLinear').addEventListener('change', updateAxisEnable);
+$('#enRotary').addEventListener('change', updateAxisEnable);
+updateAxisEnable();
+
 $('#autoStart').addEventListener('click', () => {
   const dur = parseFloat($('#autoDur').value) || 10;
   post('/api/auto', {
     action:'start', duration:dur,
+    enLin: $('#enLinear').checked, enRot: $('#enRotary').checked,
     sStart:cfg.sStart, sEnd:cfg.sEnd,
     pStart:cfg.pStart, pEnd:cfg.pEnd
   });
@@ -594,6 +612,8 @@ async function loadSettings() {
   if (!s) return;
   cfg.maxTravelMm = s.maxTravelMm;
   cfg.panMaxDeg   = s.panMaxDeg || 360;
+  cfg.maxSpeedMmS     = s.maxSpeedMmS || 50;
+  cfg.panMaxSpeedDegS = s.panMaxSpeedDegS || 90;
   cfg.sStart = clamp(s.startMm, 0, cfg.maxTravelMm);
   cfg.sEnd   = clamp(s.endMm,   0, cfg.maxTravelMm);
   cfg.pStart = clamp(s.panStartDeg, 0, cfg.panMaxDeg);
@@ -611,15 +631,6 @@ async function loadSettings() {
   $('#setPanMaxSpeed').value    = s.panMaxSpeedDegS;
   $('#setPanAccel').value       = s.panAccelDegS2;
   $('#setPanInvertDir').checked = s.panInvertDir;
-
-  const js = $('#jogSpeed');
-  js.max = s.maxSpeedMmS;
-  if (parseFloat(js.value) > s.maxSpeedMmS) js.value = s.maxSpeedMmS;
-  $('#jogSpeedVal').textContent = parseFloat(js.value).toFixed(1);
-  const pjs = $('#panJogSpeed');
-  pjs.max = s.panMaxSpeedDegS;
-  if (parseFloat(pjs.value) > s.panMaxSpeedDegS) pjs.value = s.panMaxSpeedDegS;
-  $('#panJogSpeedVal').textContent = parseFloat(pjs.value).toFixed(0);
 }
 $('#settingsSave').addEventListener('click', async () => {
   const payload = {

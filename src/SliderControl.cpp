@@ -53,6 +53,31 @@ static inline bool axisInvert(AxisId a) {
     return (a == AXIS_SLIDER) ? settings.invertDir : settings.panInvertDir;
 }
 
+// A deliberately huge acceleration used to make a move start/stop effectively
+// instantly (e.g. jog response, or the linear axis with "smooth ramping" off).
+static inline float instantAccelSteps(AxisId a) {
+    return axisMaxSpeedUnits(a) * stepsPerUnit(a) * 50.0f;
+}
+
+// Cruise speed (axis units/s) that makes a trapezoidal profile with the given
+// acceleration cover `dist` in exactly `T` seconds. Solves v/a + dist/v = T and
+// returns the lower root, so v stays <= maxSpeed whenever T is at least the
+// axis's minimum achievable time (see axisMinTime).
+static float solveCruiseSpeed(float dist, float accel, float T) {
+    if (dist <= 0.0f || T <= 0.0f || accel <= 0.0f) return 0.0f;
+    float disc = T * T * accel * accel - 4.0f * accel * dist;
+    if (disc < 0.0f) disc = 0.0f;
+    return (T * accel - sqrtf(disc)) * 0.5f;
+}
+
+// Shortest time an axis can cover `dist` given its acceleration and speed cap.
+static float axisMinTime(float dist, float accel, float vmax) {
+    if (dist <= 0.0f) return 0.0f;
+    float vPeak = sqrtf(accel * dist);
+    if (vPeak <= vmax) return 2.0f * sqrtf(dist / accel);   // triangular profile
+    return vmax / accel + dist / vmax;                      // trapezoidal at vmax
+}
+
 float Slider_axisMax(AxisId a) {
     return (a == AXIS_SLIDER) ? settings.maxTravelMm : DEFAULT_PAN_MAX_DEG;
 }
@@ -191,6 +216,10 @@ bool Slider_manualStart(AxisId axis, Direction d, float speed) {
     float maxU = axisMaxSpeedUnits(axis);
     if (speed > maxU) speed = maxU;
     ax[axis].stepper.setMaxSpeed(speed * stepsPerUnit(axis));
+    // Jog is a manual positioning aid: keep it snappy regardless of the
+    // "smooth ramping" setting (which is meant for cinematic auto moves) so the
+    // axis responds instantly on press and halts instantly on release.
+    ax[axis].stepper.setAcceleration(instantAccelSteps(axis));
 
     long target = (d == DIR_RIGHT) ? unitToSteps(axis, Slider_axisMax(axis)) : 0;
     ax[axis].stepper.moveTo(target);
@@ -200,8 +229,21 @@ bool Slider_manualStart(AxisId axis, Direction d, float speed) {
 
 void Slider_manualStop(AxisId axis) {
     if (state == STATE_MANUAL && manualAxis == axis) {
-        ax[axis].stepper.stop();   // decelerate
+        // Brisk deceleration so the axis stops the moment the button is released.
+        ax[axis].stepper.setAcceleration(instantAccelSteps(axis));
+        ax[axis].stepper.stop();
     }
+}
+
+// Treat the axis's current physical position as its new zero (origin), without
+// moving. Accepting the slider's zero also unlocks movement (counts as homed).
+bool Slider_setZero(AxisId axis) {
+    if (state != STATE_IDLE && state != STATE_BOOT && state != STATE_FAULT) return false;
+    ax[axis].stepper.setCurrentPosition(0);
+    ax[axis].stepper.moveTo(0);
+    if (axis == AXIS_SLIDER) homed = true;
+    state = STATE_IDLE;
+    return true;
 }
 
 bool Slider_gotoPos(AxisId axis, float pos) {
@@ -220,23 +262,30 @@ bool Slider_gotoMm(float mm) {
     return Slider_gotoPos(AXIS_SLIDER, mm);
 }
 
-bool Slider_startAuto(float durationSec) {
+bool Slider_startAuto(float durationSec, bool moveLin, bool moveRot) {
     if (!homed) return false;
     if (state != STATE_IDLE) return false;
     if (durationSec <= 0.1f) return false;
 
     float startU[AXIS_COUNT] = { settings.startMm, settings.panStartDeg };
     float endU[AXIS_COUNT]   = { settings.endMm,   settings.panEndDeg   };
+    bool  axisEnabled[AXIS_COUNT] = { moveLin, moveRot };  // user can exclude an axis
 
-    // Stretch the requested time if any axis can't cover its distance that fast,
-    // so both axes stay synchronised and within their speed limits.
+    // Per-axis distance and acceleration (units, units/s^2). The linear axis
+    // honours "smooth ramping"; pan always ramps. With ramping off we use a
+    // huge acceleration so the profile is effectively constant-velocity.
+    float distU[AXIS_COUNT], accelU[AXIS_COUNT];
     float effDuration = durationSec;
     for (int i = 0; i < AXIS_COUNT; i++) {
         AxisId a = (AxisId)i;
-        float dist = fabsf(endU[i] - startU[i]);
-        autoMoving[i] = (dist > 0.0001f);
+        distU[i] = fabsf(endU[i] - startU[i]);
+        autoMoving[i] = (distU[i] > 0.0001f) && axisEnabled[i];
+        bool useAccel = (a == AXIS_SLIDER) ? settings.useAccel : true;
+        accelU[i] = useAccel ? axisAccelUnits(a) : axisMaxSpeedUnits(a) * 50.0f;
         if (!autoMoving[i]) continue;
-        float minT = dist / axisMaxSpeedUnits(a);
+        // Stretch the shared time so even the most demanding axis can complete
+        // its full accel/cruise/decel profile within its own speed limit.
+        float minT = axisMinTime(distU[i], accelU[i], axisMaxSpeedUnits(a));
         if (minT > effDuration) effDuration = minT;
     }
 
@@ -244,12 +293,11 @@ bool Slider_startAuto(float durationSec) {
         AxisId a = (AxisId)i;
         autoStartStep[i]  = unitToSteps(a, startU[i]);
         autoTargetStep[i] = unitToSteps(a, endU[i]);
-        float dist = fabsf(endU[i] - startU[i]);
-        float reqU = (effDuration > 0) ? dist / effDuration : 0;
-        autoSpeedStepsS[i]  = reqU * stepsPerUnit(a);
-        bool useAccel = (a == AXIS_SLIDER) ? settings.useAccel : true;
-        autoAccelStepsS2[i] = useAccel ? axisAccelUnits(a) * stepsPerUnit(a)
-                                       : axisMaxSpeedUnits(a) * stepsPerUnit(a) * 50.0f;
+        // Cruise speed chosen so this axis's trapezoidal move takes exactly
+        // effDuration -> every axis starts and finishes together.
+        float vCruise = solveCruiseSpeed(distU[i], accelU[i], effDuration);
+        autoSpeedStepsS[i]  = vCruise * stepsPerUnit(a);
+        autoAccelStepsS2[i] = accelU[i] * stepsPerUnit(a);
 
         // Reposition phase: drive each moving axis to its start at full speed.
         if (autoMoving[i]) {
