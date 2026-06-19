@@ -44,7 +44,7 @@
 // ---------- WiFi Station (connect to your network) ----------
 #define WIFI_STA_TIMEOUT_MS  15000       // give up after this and fall back to AP
 #define MDNS_HOST            "camera-slider"   // reachable as camera-slider.local
-#define DEVICE_NAME          "Fergineer Slider"  // user-visible name (external apps, e.g. PrintLapse)
+#define DEVICE_NAME          "Fergineer Slider"  // user-visible device name
 #define WIFI_CREDS_FILE      "/wifi.json"      // saved credentials on LittleFS
 
 // ---------- Defaults (used when EEPROM empty) ----------

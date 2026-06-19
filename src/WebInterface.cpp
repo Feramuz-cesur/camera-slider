@@ -6,17 +6,15 @@
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include <WebSocketsServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
-static WebServer server(80);
-static uint32_t g_rebootAt = 0;   // 0 = no pending reboot
+static WebServer        server(80);   // serves the page + settings/wifi (request/response)
+static WebSocketsServer ws(81);       // live status push + low-latency control commands
+static uint32_t g_rebootAt = 0;       // 0 = no pending reboot
 
-// External control lock (e.g. PrintLapse app takes over the slider)
-static bool   g_locked   = false;
-static String g_lockedBy = "";
-
-// Detailed state token used by our own web UI
+// Detailed state token used by our web UI
 static const char* stateShortName(SliderState s) {
     switch (s) {
         case STATE_BOOT:            return "BOOT";
@@ -34,24 +32,6 @@ static const char* stateShortName(SliderState s) {
     return "?";
 }
 
-// Coarse state token for external apps (PrintLapse contract): idle|homing|moving|error|estop
-static const char* stateApiName(SliderState s) {
-    switch (s) {
-        case STATE_BOOT:            return "idle";
-        case STATE_HOMING_FAST:
-        case STATE_HOMING_BACKOFF:
-        case STATE_HOMING_SLOW:     return "homing";
-        case STATE_IDLE:            return "idle";
-        case STATE_AUTO_PAUSED:     return "idle";
-        case STATE_MANUAL:
-        case STATE_AUTO_REPOSITION:
-        case STATE_AUTO_MOVE:
-        case STATE_CALIBRATE:       return "moving";
-        case STATE_FAULT:           return "error";
-    }
-    return "idle";
-}
-
 // ---------- Handlers ----------
 static void handleIndex() {
     // AP mode -> WiFi provisioning page; STA mode -> the control UI.
@@ -66,149 +46,101 @@ static void handleIndex() {
     f.close();
 }
 
-static void handlePing() {
-    // Lightweight identity handshake for external apps (PrintLapse "Test Connection").
-    // Stays fast and works even while locked (read-only, no lock check).
-    server.send(200, "application/json",
-        "{\"ok\":true,\"device\":\"slider\",\"name\":\"" DEVICE_NAME "\"}");
-}
-
-static void handleStatus() {
+// ---------- Live status + control over WebSocket ----------
+static void buildStatus(String& out) {
     JsonDocument doc;
-    doc["state"]     = stateApiName(Slider_state());    // contract: idle|homing|moving|error|estop
-    doc["stateRaw"]  = stateShortName(Slider_state());  // detailed token for our own UI
+    doc["stateRaw"]  = stateShortName(Slider_state());
     doc["stateText"] = Slider_stateText();
-    doc["pos"]       = Slider_positionMm();             // slider mm (PrintLapse contract)
-    doc["panPos"]    = Slider_position(AXIS_PAN);        // pan degrees
+    doc["pos"]       = Slider_positionMm();       // slider mm
+    doc["panPos"]    = Slider_position(AXIS_PAN);  // pan degrees
     doc["homed"]     = Slider_isHomed();
     doc["motors"]    = Slider_motorsEnabled();
     doc["progress"]  = Slider_autoProgress();
-    doc["locked"]    = g_locked;
-    doc["by"]        = g_lockedBy;
-    String out;
     serializeJson(doc, out);
-    server.send(200, "application/json", out);
 }
 
-static void handleHome() {
-    bool ok = Slider_startHoming();
-    server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
-}
-
-static void handleSkipHome() {
-    Slider_skipHoming();
-    server.send(200, "application/json", "{\"ok\":true}");
-}
-
-static void handleManual() {
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, server.arg("plain"));
-    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    const char* action = doc["action"] | "";
-    const char* axisStr = doc["axis"] | "slider";
-    AxisId axis = (strcmp(axisStr, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
-    if (strcmp(action, "start") == 0) {
-        if (g_locked) { server.send(409, "application/json", "{\"ok\":false}"); return; }
-        const char* dir = doc["dir"] | "";
-        float defSpeed = (axis == AXIS_PAN) ? settings.panMaxSpeedDegS : settings.maxSpeedMmS;
-        float speed = doc["speed"] | defSpeed;   // jog speed in axis units/s
-        bool ok = Slider_manualStart(axis, strcmp(dir, "right") == 0 ? DIR_RIGHT : DIR_LEFT, speed);
-        server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
-    } else if (strcmp(action, "stop") == 0) {
-        Slider_manualStop(axis);
-        server.send(200, "application/json", "{\"ok\":true}");
-    } else {
-        server.send(400, "application/json", "{\"ok\":false}");
-    }
-}
-
-static void handleAuto() {
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, server.arg("plain"));
-    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    const char* action = doc["action"] | "";
-    if (strcmp(action, "start") == 0) {
-        if (g_locked) { server.send(409, "application/json", "{\"ok\":false}"); return; }
-        float duration = doc["duration"] | 10.0f;
-
-        // Optional per-axis start/end overrides. When present we persist them so
-        // the move (and future runs) use exactly what the UI shows.
-        bool changed = false;
-        if (doc["sStart"].is<float>() || doc["sEnd"].is<float>()) {
-            float a = doc["sStart"] | settings.startMm;
-            float b = doc["sEnd"]   | settings.endMm;
-            a = constrain(a, 0.0f, settings.maxTravelMm);
-            b = constrain(b, 0.0f, settings.maxTravelMm);
-            settings.startMm = a; settings.endMm = b; changed = true;
-        }
-        if (doc["pStart"].is<float>() || doc["pEnd"].is<float>()) {
-            float a = doc["pStart"] | settings.panStartDeg;
-            float b = doc["pEnd"]   | settings.panEndDeg;
-            a = constrain(a, 0.0f, DEFAULT_PAN_MAX_DEG);
-            b = constrain(b, 0.0f, DEFAULT_PAN_MAX_DEG);
-            settings.panStartDeg = a; settings.panEndDeg = b; changed = true;
-        }
-        if (changed) Settings_save();
-
-        bool enLin = doc["enLin"] | true;   // include the linear axis in the move
-        bool enRot = doc["enRot"] | true;   // include the rotary axis in the move
-        bool ok = Slider_startAuto(duration, enLin, enRot);
-        server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
-    } else if (strcmp(action, "stop") == 0) {
-        Slider_stopAuto();
-        server.send(200, "application/json", "{\"ok\":true}");
-    } else if (strcmp(action, "pause") == 0) {
-        bool ok = Slider_pauseAuto();
-        server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
-    } else if (strcmp(action, "resume") == 0) {
-        bool ok = Slider_resumeAuto();
-        server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
-    } else {
-        server.send(400, "application/json", "{\"ok\":false}");
-    }
-}
-
-static void handleEstop() {
-    Slider_emergencyStop();
-    server.send(200, "application/json", "{\"ok\":true}");
-}
-
-static void handleMotors() {
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, server.arg("plain"));
-    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    bool enabled = doc["enabled"] | true;
-    bool ok = Slider_setMotorsEnabled(enabled);
-    JsonDocument res;
-    res["ok"]      = ok;
-    res["enabled"] = Slider_motorsEnabled();
+static void broadcastStatus() {
     String out;
-    serializeJson(res, out);
-    server.send(ok ? 200 : 409, "application/json", out);
+    buildStatus(out);
+    ws.broadcastTXT(out);
 }
 
-static void handleGoto() {
+// One inbound command frame. Commands are fire-and-forget: the result shows up
+// in the next status push, so we send no per-command reply.
+static void handleWsText(uint8_t* payload, size_t length) {
     JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, server.arg("plain"));
-    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    float pos = doc["pos"] | 0.0f;
-    // axis defaults to the linear slider (PrintLapse contract: pos in mm).
-    const char* axisStr = doc["axis"] | "slider";
-    AxisId axis = (strcmp(axisStr, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
-    // Accept and return immediately; the move runs in the background (contract).
-    bool ok = Slider_gotoPos(axis, pos);
-    server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
+    if (deserializeJson(doc, (const char*)payload, length)) return;
+    const char* t = doc["t"] | "";
+
+    auto axisOf = [&]() -> AxisId {
+        const char* s = doc["axis"] | "slider";
+        return (strcmp(s, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
+    };
+
+    if (strcmp(t, "manual") == 0) {
+        const char* action = doc["action"] | "";
+        AxisId axis = axisOf();
+        if (strcmp(action, "start") == 0) {
+            const char* dir = doc["dir"] | "";
+            float defSpeed = (axis == AXIS_PAN) ? settings.panMaxSpeedDegS : settings.maxSpeedMmS;
+            float speed = doc["speed"] | defSpeed;
+            Slider_manualStart(axis, strcmp(dir, "right") == 0 ? DIR_RIGHT : DIR_LEFT, speed);
+        } else if (strcmp(action, "stop") == 0) {
+            Slider_manualStop(axis);
+        }
+    } else if (strcmp(t, "goto") == 0) {
+        Slider_gotoPos(axisOf(), doc["pos"] | 0.0f);
+    } else if (strcmp(t, "setzero") == 0) {
+        Slider_setZero(axisOf());
+    } else if (strcmp(t, "home") == 0) {
+        Slider_startHoming();
+    } else if (strcmp(t, "skiphome") == 0) {
+        Slider_skipHoming();
+    } else if (strcmp(t, "estop") == 0) {
+        Slider_emergencyStop();
+    } else if (strcmp(t, "motors") == 0) {
+        Slider_setMotorsEnabled(doc["enabled"] | true);
+    } else if (strcmp(t, "auto") == 0) {
+        const char* action = doc["action"] | "";
+        if (strcmp(action, "start") == 0) {
+            float duration = doc["duration"] | 10.0f;
+            // Persist any per-axis start/end overrides so the move uses what the UI shows.
+            bool changed = false;
+            if (doc["sStart"].is<float>() || doc["sEnd"].is<float>()) {
+                float a = doc["sStart"] | settings.startMm;
+                float b = doc["sEnd"]   | settings.endMm;
+                settings.startMm = constrain(a, 0.0f, settings.maxTravelMm);
+                settings.endMm   = constrain(b, 0.0f, settings.maxTravelMm);
+                changed = true;
+            }
+            if (doc["pStart"].is<float>() || doc["pEnd"].is<float>()) {
+                float a = doc["pStart"] | settings.panStartDeg;
+                float b = doc["pEnd"]   | settings.panEndDeg;
+                settings.panStartDeg = constrain(a, 0.0f, DEFAULT_PAN_MAX_DEG);
+                settings.panEndDeg   = constrain(b, 0.0f, DEFAULT_PAN_MAX_DEG);
+                changed = true;
+            }
+            if (changed) Settings_save();
+            Slider_startAuto(duration, doc["enLin"] | true, doc["enRot"] | true);
+        } else if (strcmp(action, "stop") == 0) {
+            Slider_stopAuto();
+        } else if (strcmp(action, "pause") == 0) {
+            Slider_pauseAuto();
+        } else if (strcmp(action, "resume") == 0) {
+            Slider_resumeAuto();
+        }
+    }
+    broadcastStatus();   // reflect the command immediately
 }
 
-static void handleSetZero() {
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, server.arg("plain"));
-    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    if (g_locked) { server.send(409, "application/json", "{\"ok\":false}"); return; }
-    const char* axisStr = doc["axis"] | "slider";
-    AxisId axis = (strcmp(axisStr, "pan") == 0) ? AXIS_PAN : AXIS_SLIDER;
-    bool ok = Slider_setZero(axis);
-    server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
+static void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
+    if (type == WStype_TEXT) {
+        handleWsText(payload, length);
+    } else if (type == WStype_CONNECTED) {
+        String out;
+        buildStatus(out);
+        ws.sendTXT(num, out);   // immediate snapshot for the new client
+    }
 }
 
 static void handleSettingsGet() {
@@ -302,53 +234,6 @@ static void handleSettingsPost() {
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
-static void handleCalibrate() {
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, server.arg("plain"));
-    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    const char* action = doc["action"] | "";
-
-    if (strcmp(action, "spin") == 0) {
-        float turns = doc["turns"] | 0.0f;
-        if (turns <= 0 || turns > 100) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-        long steps = (long)(turns * settings.stepsPerRev + 0.5f);
-        bool ok = Slider_calibrateSpin(steps);
-        server.send(ok ? 200 : 409, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
-        return;
-    }
-
-    if (strcmp(action, "apply") == 0) {
-        float turns    = doc["turns"]    | 0.0f;
-        float measured = doc["measured"] | 0.0f;
-        if (turns <= 0 || measured <= 0) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-        float stepsPerMm = (turns * settings.stepsPerRev) / measured;
-        if (stepsPerMm < 1 || stepsPerMm > 3200) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-        settings.stepsPerMm = stepsPerMm;
-        Settings_save();
-        Slider_applySettings();
-        JsonDocument res;
-        res["ok"]         = true;
-        res["stepsPerMm"] = stepsPerMm;
-        res["mmPerRev"]   = settings.stepsPerRev / stepsPerMm;
-        String out;
-        serializeJson(res, out);
-        server.send(200, "application/json", out);
-        return;
-    }
-
-    server.send(400, "application/json", "{\"ok\":false}");
-}
-
-static void handleLock() {
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, server.arg("plain"));
-    if (err) { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    bool locked = doc["locked"] | false;
-    g_locked   = locked;
-    g_lockedBy = locked ? String((const char*)(doc["by"] | "")) : String("");
-    server.send(200, "application/json", "{\"ok\":true}");
-}
-
 // ---------- WiFi provisioning ----------
 static void handleWifiStatus() {
     JsonDocument doc;
@@ -415,21 +300,10 @@ static void handleNotFound() {
 void Web_begin() {
     LittleFS.begin();   // WiFi mode is already configured by Wifi_begin()
 
-    server.on("/",              HTTP_GET,  handleIndex);
-    server.on("/api/ping",      HTTP_GET,  handlePing);
-    server.on("/api/status",    HTTP_GET,  handleStatus);
-    server.on("/api/home",      HTTP_POST, handleHome);
-    server.on("/api/skiphome",  HTTP_POST, handleSkipHome);
-    server.on("/api/calibrate", HTTP_POST, handleCalibrate);
-    server.on("/api/manual",    HTTP_POST, handleManual);
-    server.on("/api/auto",      HTTP_POST, handleAuto);
-    server.on("/api/estop",     HTTP_POST, handleEstop);
-    server.on("/api/motors",    HTTP_POST, handleMotors);
-    server.on("/api/goto",      HTTP_POST, handleGoto);
-    server.on("/api/setzero",   HTTP_POST, handleSetZero);
-    server.on("/api/lock",      HTTP_POST, handleLock);
-    server.on("/api/settings",  HTTP_GET,  handleSettingsGet);
-    server.on("/api/settings",  HTTP_POST, handleSettingsPost);
+    // HTTP: serve the page and the request/response config endpoints.
+    server.on("/",                HTTP_GET,  handleIndex);
+    server.on("/api/settings",    HTTP_GET,  handleSettingsGet);
+    server.on("/api/settings",    HTTP_POST, handleSettingsPost);
     server.on("/api/wifi",        HTTP_GET,  handleWifiStatus);
     server.on("/api/wifi/scan",   HTTP_GET,  handleWifiScan);
     server.on("/api/wifi",        HTTP_POST, handleWifiSave);
@@ -440,11 +314,25 @@ void Web_begin() {
 
     server.onNotFound(handleNotFound);
     server.begin();
+
+    // WebSocket: live status push + low-latency control commands.
+    ws.begin();
+    ws.onEvent(onWsEvent);
 }
 
 void Web_loop() {
     server.handleClient();
-    if (g_rebootAt && (int32_t)(millis() - g_rebootAt) >= 0) {
+    ws.loop();
+
+    // Push the live status to all connected clients at ~10 Hz.
+    static uint32_t lastPush = 0;
+    uint32_t now = millis();
+    if (now - lastPush >= 100) {
+        lastPush = now;
+        broadcastStatus();
+    }
+
+    if (g_rebootAt && (int32_t)(now - g_rebootAt) >= 0) {
         ESP.restart();
     }
 }

@@ -340,19 +340,12 @@
   <p id="homingMsg" class="small" style="margin-top:14px"></p>
 </div>
 
-<div id="appLockOverlay" class="lock-overlay hidden">
-  <h2>Controlled externally</h2>
-  <p id="lockedByText">In use by an external app</p>
-  <p class="small">The web controls are disabled while an app is driving the slider.</p>
-</div>
-
 <script>
 const $ = q => document.querySelector(q);
 const $$ = q => document.querySelectorAll(q);
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 
-let state = { homed:false, state:'?', pos:0, panPos:0, progress:0 };
-let pollFailures = 0;
+let state = { homed:false, pos:0, panPos:0, progress:0 };
 
 // Geometry / shot config, seeded from /api/settings.
 let cfg = { maxTravelMm:300, panMaxDeg:360, sStart:0, sEnd:300, pStart:0, pEnd:360,
@@ -379,6 +372,18 @@ const post = (path, body) => api(path, {
   method:'POST', headers:{'Content-Type':'application/json'},
   body: body ? JSON.stringify(body) : undefined
 });
+
+// ---- WebSocket (live status push + low-latency control commands) ----
+let ws = null;
+function wsSend(o){ if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); }
+function connectWs(){
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto + '://' + location.hostname + ':81/');
+  ws.onopen    = () => { $('#connBadge').className = 'badge ok';  $('#connBadge').textContent = 'connected'; };
+  ws.onclose   = () => { $('#connBadge').className = 'badge bad'; $('#connBadge').textContent = 'offline'; setTimeout(connectWs, 1000); };
+  ws.onerror   = () => { try { ws.close(); } catch(e){} };
+  ws.onmessage = ev => { try { applyStatus(JSON.parse(ev.data)); } catch(e){} };
+}
 
 /* =========================================================
    Linear dual-thumb range
@@ -495,14 +500,14 @@ $$('.miniact button[data-edge]').forEach(b => b.addEventListener('click', () => 
   let pos;
   if (axis === 'slider') pos = (b.dataset.edge === 'start') ? cfg.sStart : cfg.sEnd;
   else                   pos = (b.dataset.edge === 'start') ? cfg.pStart : cfg.pEnd;
-  post('/api/goto', { axis, pos });
+  wsSend({ t:'goto', axis, pos });
 }));
 
 // ---- Accept zero (set current as origin) / Go zero ----
 $$('.miniact button[data-zero]').forEach(b => b.addEventListener('click', () => {
   const axis = b.dataset.axis;
-  if (b.dataset.zero === 'go') post('/api/goto', { axis, pos:0 });
-  else                         post('/api/setzero', { axis });
+  if (b.dataset.zero === 'go') wsSend({ t:'goto', axis, pos:0 });
+  else                         wsSend({ t:'setzero', axis });
 }));
 
 // ---- Per-axis jog: press & hold (Left/Right under each path) ----
@@ -511,8 +516,8 @@ function bindJog(el, axis, dir) {
   const speed = () => (axis === 'pan')
     ? Math.min(cfg.panJogSpeedDegS, cfg.panMaxSpeedDegS)
     : Math.min(cfg.jogSpeedMmS, cfg.maxSpeedMmS);
-  const start = e => { e.preventDefault(); post('/api/manual', {action:'start', axis, dir, speed:speed()}); };
-  const stop  = e => { e.preventDefault(); post('/api/manual', {action:'stop', axis}); };
+  const start = e => { e.preventDefault(); wsSend({ t:'manual', action:'start', axis, dir, speed:speed() }); };
+  const stop  = e => { e.preventDefault(); wsSend({ t:'manual', action:'stop', axis }); };
   el.addEventListener('mousedown', start);
   el.addEventListener('touchstart', start, {passive:false});
   el.addEventListener('mouseup', stop);
@@ -523,19 +528,10 @@ function bindJog(el, axis, dir) {
 $$('.jogbtn').forEach(b => bindJog(b, b.dataset.jog, b.dataset.dir));
 
 /* =========================================================
-   Status polling
+   Live status (pushed over WebSocket)
    ========================================================= */
-async function poll() {
-  const s = await api('/api/status');
-  if (!s) {
-    pollFailures++;
-    if (pollFailures > 3) { $('#connBadge').className='badge bad'; $('#connBadge').textContent='offline'; }
-    return;
-  }
-  pollFailures = 0;
+function applyStatus(s) {
   state = s;
-  $('#connBadge').className = 'badge ok';
-  $('#connBadge').textContent = 'connected';
   $('#statText').textContent = s.stateText;
   $('#posVal').textContent = s.pos.toFixed(1);
   $('#panVal').textContent = (s.panPos||0).toFixed(1);
@@ -546,13 +542,6 @@ async function poll() {
   let frac = inAuto ? s.progress : (cfg.maxTravelMm > 0 ? s.pos / cfg.maxTravelMm : 0);
   frac = clamp(frac, 0, 1);
   $('#progBar').style.width = (frac * 100).toFixed(1) + '%';
-
-  if (s.locked) {
-    $('#appLockOverlay').classList.remove('hidden');
-    $('#lockedByText').textContent = s.by ? ('In use by ' + s.by) : 'In use by an external app';
-  } else {
-    $('#appLockOverlay').classList.add('hidden');
-  }
 
   if (s.homed) {
     $('#lockOverlay').classList.add('hidden');
@@ -579,20 +568,18 @@ async function poll() {
   $('#autoResume').style.display = isPaused ? 'block' : 'none';
   $('#autoStop').style.display   = isActive ? 'block' : 'none';
 }
-const POLL_GAP = 100;
-async function pollLoop(){ for(;;){ await poll(); await new Promise(r => setTimeout(r, POLL_GAP)); } }
-pollLoop();
+connectWs();
 
 // ---- Homing ----
-$('#homeBtn').addEventListener('click', async () => {
+$('#homeBtn').addEventListener('click', () => {
   $('#homingMsg').textContent = 'Moving to limit switch...';
-  await post('/api/home');
+  wsSend({ t:'home' });
 });
-$('#skipHomeBtn').addEventListener('click', () => post('/api/skiphome'));
-$('#stopHomeBtn').addEventListener('click', () => post('/api/estop'));
+$('#skipHomeBtn').addEventListener('click', () => wsSend({ t:'skiphome' }));
+$('#stopHomeBtn').addEventListener('click', () => wsSend({ t:'estop' }));
 
-$('#motorsBtn').addEventListener('click', () => post('/api/motors', { enabled: !state.motors }));
-$('#rehome').addEventListener('click', () => post('/api/home'));
+$('#motorsBtn').addEventListener('click', () => wsSend({ t:'motors', enabled: !state.motors }));
+$('#rehome').addEventListener('click', () => wsSend({ t:'home' }));
 
 // ---- Auto move ----
 // Per-axis enable toggles: leave an axis out of the move, and disable Start
@@ -607,16 +594,16 @@ updateAxisEnable();
 $('#autoStart').addEventListener('click', () => {
   const unit = parseFloat($('#autoUnit').value) || 1;   // 1=sec, 60=min, 3600=hour
   const dur = (parseFloat($('#autoDur').value) || 0) * unit;   // seconds
-  post('/api/auto', {
-    action:'start', duration:dur,
+  wsSend({
+    t:'auto', action:'start', duration:dur,
     enLin: $('#enLinear').checked, enRot: $('#enRotary').checked,
     sStart:cfg.sStart, sEnd:cfg.sEnd,
     pStart:cfg.pStart, pEnd:cfg.pEnd
   });
 });
-$('#autoStop').addEventListener('click',   () => post('/api/auto', {action:'stop'}));
-$('#autoPause').addEventListener('click',  () => post('/api/auto', {action:'pause'}));
-$('#autoResume').addEventListener('click', () => post('/api/auto', {action:'resume'}));
+$('#autoStop').addEventListener('click',   () => wsSend({ t:'auto', action:'stop' }));
+$('#autoPause').addEventListener('click',  () => wsSend({ t:'auto', action:'pause' }));
+$('#autoResume').addEventListener('click', () => wsSend({ t:'auto', action:'resume' }));
 
 /* =========================================================
    Settings
