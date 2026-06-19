@@ -58,6 +58,7 @@
 #define DEFAULT_MAX_TRAVEL_MM   300.0f
 #define DEFAULT_MAX_SPEED_MMS   50.0f    // NEMA 17 + A4988 handles much higher rates
 #define DEFAULT_ACCEL_MMS2      80.0f
+#define DEFAULT_JOG_SPEED_MMS   30.0f    // manual jog speed (mm/s)
 #define DEFAULT_HOMING_SPEED_MMS 10.0f   // approach speed toward the limit switch
 #define DEFAULT_USE_ACCEL       true
 #define DEFAULT_INVERT_DIR      false
@@ -74,6 +75,7 @@
 #define DEFAULT_PAN_MAX_DEG       360.0f   // usable rotation range
 #define DEFAULT_PAN_MAX_SPEED_DEGS 90.0f   // deg/s upper limit
 #define DEFAULT_PAN_ACCEL_DEGS2    180.0f  // deg/s^2
+#define DEFAULT_PAN_JOG_SPEED_DEGS 45.0f   // manual jog speed (deg/s)
 #define DEFAULT_PAN_INVERT_DIR     false
 #define DEFAULT_PAN_START_DEG      0.0f
 #define DEFAULT_PAN_END_DEG        360.0f

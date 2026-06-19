@@ -59,6 +59,19 @@
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle}
   .dot.ok{background:var(--ok)} .dot.ap{background:var(--warn)}
   .small{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+
+  /* custom checkbox */
+  .check{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:12px;
+    color:var(--muted);margin-top:10px;user-select:none}
+  .check input{position:absolute;opacity:0;width:0;height:0}
+  .check .box{width:20px;height:20px;flex:none;border:1px solid var(--line);border-radius:6px;
+    background:#0f1218;display:flex;align-items:center;justify-content:center;
+    transition:background .15s,border-color .15s}
+  .check .box::after{content:"";width:5px;height:10px;margin-top:-2px;border:solid #fff;
+    border-width:0 2px 2px 0;transform:rotate(45deg) scale(0);transition:transform .15s}
+  .check input:checked + .box{background:var(--accent2);border-color:var(--accent)}
+  .check input:checked + .box::after{transform:rotate(45deg) scale(1)}
+  .check input:focus-visible + .box{border-color:var(--accent)}
   .msg{font-size:13px;margin-top:10px;min-height:18px}
   .msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
 </style>
@@ -71,12 +84,6 @@
 </header>
 
 <main>
-  <div class="card">
-    <h2>Current</h2>
-    <div class="row"><span class="label">Mode</span><span class="val"><span id="modeDot" class="dot"></span><span id="mode">—</span></span></div>
-    <div class="row"><span class="label">Address</span><span id="ip" class="val">—</span></div>
-  </div>
-
   <div class="card">
     <div class="card-head">
       <h2>Choose a network</h2>
@@ -96,17 +103,11 @@
       <label>Password</label>
       <input type="password" id="pass" placeholder="password" autocomplete="off">
     </div>
-    <label class="small" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-      <input type="checkbox" id="showPass"> Show password
+    <label class="check">
+      <input type="checkbox" id="showPass"><span class="box"></span> Show password
     </label>
     <button class="btn" id="connect">Save &amp; Connect</button>
     <p id="msg" class="msg"></p>
-  </div>
-
-  <div class="card">
-    <p class="small">After connecting, the <b>CameraSlider</b> Wi-Fi disappears. Rejoin your home Wi-Fi, then open
-      <b>http://camera-slider.local</b> (or the slider's new IP) to reach the controls. If the connection fails,
-      the slider returns to this setup AP.</p>
   </div>
 </main>
 
@@ -116,15 +117,6 @@ const $ = q => document.querySelector(q);
 async function api(path, opts){
   try{ const r = await fetch(path, opts); if(!r.ok) throw 0; return await r.json(); }
   catch(e){ return null; }
-}
-
-async function loadStatus(){
-  const w = await api('/api/wifi');
-  if(!w) return;
-  const sta = w.mode === 'sta';
-  $('#mode').textContent = sta ? ('Connected to ' + (w.ssid||'')) : ('Access Point (' + (w.apSsid||'setup') + ')');
-  $('#modeDot').className = 'dot ' + (sta ? 'ok' : 'ap');
-  $('#ip').textContent = w.ip || '—';
 }
 
 // RSSI (dBm) -> 1..4 bars
@@ -142,27 +134,20 @@ function selectNet(ssid, el){
   $('#pass').focus();
 }
 
-async function scan(){
-  $('#scan').disabled = true; $('#scan').textContent = 'Scanning…';
-  const list = $('#list'); const hint = $('#hint');
-  list.innerHTML = ''; hint.style.display = 'block'; hint.textContent = 'Scanning…';
+// A single scan often misses APs, so we accumulate results across scans
+// (keyed by SSID, keeping the strongest signal) instead of replacing the list.
+const found = new Map();
 
-  const nets = await api('/api/wifi/scan');
-  $('#scan').disabled = false; $('#scan').textContent = 'Rescan';
-
-  if(!nets || !nets.length){ hint.textContent = 'No networks found.'; return; }
+function renderNets(){
+  const list = $('#list'), hint = $('#hint');
+  const nets = [...found.values()].sort((a,b)=>b.rssi-a.rssi);
+  if(!nets.length){ list.innerHTML=''; hint.style.display='block'; return; }
   hint.style.display = 'none';
-
-  // strongest first, drop duplicate SSIDs
-  nets.sort((a,b)=>b.rssi-a.rssi);
-  const seen = new Set();
+  const sel = $('#ssid').value;
+  list.innerHTML = '';
   for(const n of nets){
-    if(!n.ssid || seen.has(n.ssid)) continue;
-    seen.add(n.ssid);
-
     const row = document.createElement('div');
-    row.className = 'net' + (n.ssid === $('#ssid').value ? ' sel' : '');
-
+    row.className = 'net' + (n.ssid === sel ? ' sel' : '');
     const b = bars(n.rssi);
     row.innerHTML =
       '<span class="name"></span>' +
@@ -172,6 +157,27 @@ async function scan(){
     row.addEventListener('click', () => selectNet(n.ssid, row));
     list.appendChild(row);
   }
+}
+
+let scanning = false;
+async function scan(){
+  if(scanning) return;
+  scanning = true;
+  $('#scan').disabled = true; $('#scan').textContent = 'Scanning…';
+  if(!found.size){ $('#hint').style.display='block'; $('#hint').textContent = 'Scanning…'; }
+
+  const nets = await api('/api/wifi/scan');
+  if(nets){
+    for(const n of nets){
+      if(!n.ssid) continue;
+      const prev = found.get(n.ssid);
+      if(!prev || n.rssi > prev.rssi) found.set(n.ssid, {ssid:n.ssid, rssi:n.rssi, lock:n.lock});
+    }
+  }
+  renderNets();
+  if(!found.size) $('#hint').textContent = 'No networks found yet — rescanning…';
+  $('#scan').disabled = false; $('#scan').textContent = 'Rescan';
+  scanning = false;
 }
 
 $('#scan').addEventListener('click', scan);
@@ -190,8 +196,10 @@ $('#connect').addEventListener('click', async () => {
   });
 });
 
-loadStatus();
-scan();   // auto-scan as soon as the page opens
+// Auto-scan a few times on open so slow-to-respond networks still show up.
+(async function initScan(){
+  for(let i=0;i<3;i++){ await scan(); await new Promise(r=>setTimeout(r,1200)); }
+})();
 </script>
 </body>
 </html>

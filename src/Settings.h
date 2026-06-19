@@ -10,8 +10,9 @@ struct SliderSettings {
     float    maxTravelMm;    // usable rail length
     float    maxSpeedMmS;    // upper speed limit (mm/s)
     float    accelMmS2;      // acceleration (mm/s^2)
+    float    jogSpeedMmS;    // manual jog speed (mm/s)
     float    homingSpeedMmS; // approach speed toward the limit switch (mm/s)
-    bool     useAccel;       // smooth ramp on/off
+    bool     useAccel;       // smooth ramp on/off (applies to both axes, jog + auto)
     bool     invertDir;      // flip motor direction
     float    startMm;        // auto-move start position (mm)
     float    endMm;          // auto-move end position (mm)
@@ -20,6 +21,7 @@ struct SliderSettings {
     uint16_t panStepsPerRev; // steps for one full 360° platform turn
     float    panMaxSpeedDegS;// upper speed limit (deg/s)
     float    panAccelDegS2;  // acceleration (deg/s^2)
+    float    panJogSpeedDegS;// manual jog speed (deg/s)
     bool     panInvertDir;   // flip pan direction
     float    panStartDeg;    // auto-move start angle (deg)
     float    panEndDeg;      // auto-move end angle (deg)

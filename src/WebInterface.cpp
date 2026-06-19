@@ -219,6 +219,7 @@ static void handleSettingsGet() {
     doc["maxTravelMm"] = settings.maxTravelMm;
     doc["maxSpeedMmS"] = settings.maxSpeedMmS;
     doc["accelMmS2"]   = settings.accelMmS2;
+    doc["jogSpeedMmS"] = settings.jogSpeedMmS;
     doc["homingSpeedMmS"] = settings.homingSpeedMmS;
     doc["useAccel"]    = settings.useAccel;
     doc["invertDir"]   = settings.invertDir;
@@ -228,6 +229,7 @@ static void handleSettingsGet() {
     doc["panStepsPerRev"]  = settings.panStepsPerRev;
     doc["panMaxSpeedDegS"] = settings.panMaxSpeedDegS;
     doc["panAccelDegS2"]   = settings.panAccelDegS2;
+    doc["panJogSpeedDegS"] = settings.panJogSpeedDegS;
     doc["panInvertDir"]    = settings.panInvertDir;
     doc["panStartDeg"]     = settings.panStartDeg;
     doc["panEndDeg"]       = settings.panEndDeg;
@@ -248,6 +250,7 @@ static void handleSettingsPost() {
     float    maxTravelMm = doc["maxTravelMm"] | settings.maxTravelMm;
     float    maxSpeedMmS = doc["maxSpeedMmS"] | settings.maxSpeedMmS;
     float    accelMmS2   = doc["accelMmS2"]   | settings.accelMmS2;
+    float    jogSpeedMmS = doc["jogSpeedMmS"] | settings.jogSpeedMmS;
     float    homingSpeed = doc["homingSpeedMmS"] | settings.homingSpeedMmS;
     bool     useAccel    = doc["useAccel"]    | settings.useAccel;
     bool     invertDir   = doc["invertDir"]   | settings.invertDir;
@@ -257,6 +260,7 @@ static void handleSettingsPost() {
     uint16_t panStepsPerRev  = doc["panStepsPerRev"]  | settings.panStepsPerRev;
     float    panMaxSpeedDegS = doc["panMaxSpeedDegS"] | settings.panMaxSpeedDegS;
     float    panAccelDegS2   = doc["panAccelDegS2"]   | settings.panAccelDegS2;
+    float    panJogSpeedDegS = doc["panJogSpeedDegS"] | settings.panJogSpeedDegS;
     bool     panInvertDir    = doc["panInvertDir"]    | settings.panInvertDir;
     float    panStartDeg     = doc["panStartDeg"]     | settings.panStartDeg;
     float    panEndDeg       = doc["panEndDeg"]       | settings.panEndDeg;
@@ -272,12 +276,15 @@ static void handleSettingsPost() {
     if (panStepsPerRev < 1 || panStepsPerRev > 60000) { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (panMaxSpeedDegS < 1 || panMaxSpeedDegS > 2000) { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (panAccelDegS2   < 1 || panAccelDegS2   > 10000){ server.send(400, "application/json", "{\"ok\":false}"); return; }
+    if (jogSpeedMmS     < 1 || jogSpeedMmS     > 500)  { server.send(400, "application/json", "{\"ok\":false}"); return; }
+    if (panJogSpeedDegS < 1 || panJogSpeedDegS > 2000) { server.send(400, "application/json", "{\"ok\":false}"); return; }
 
     settings.stepsPerMm  = stepsPerMm;
     settings.stepsPerRev = stepsPerRev;
     settings.maxTravelMm = maxTravelMm;
     settings.maxSpeedMmS = maxSpeedMmS;
     settings.accelMmS2   = accelMmS2;
+    settings.jogSpeedMmS = jogSpeedMmS;
     settings.homingSpeedMmS = homingSpeed;
     settings.useAccel    = useAccel;
     settings.invertDir   = invertDir;
@@ -286,6 +293,7 @@ static void handleSettingsPost() {
     settings.panStepsPerRev  = panStepsPerRev;
     settings.panMaxSpeedDegS = panMaxSpeedDegS;
     settings.panAccelDegS2   = panAccelDegS2;
+    settings.panJogSpeedDegS = panJogSpeedDegS;
     settings.panInvertDir    = panInvertDir;
     settings.panStartDeg     = constrain(panStartDeg, 0.0f, DEFAULT_PAN_MAX_DEG);
     settings.panEndDeg       = constrain(panEndDeg,   0.0f, DEFAULT_PAN_MAX_DEG);
@@ -356,7 +364,10 @@ static void handleWifiStatus() {
 }
 
 static void handleWifiScan() {
-    int n = WiFi.scanNetworks();
+    // Active scan with a longer per-channel dwell (and include hidden APs) so we
+    // catch networks a quick default scan tends to miss.
+    int n = WiFi.scanNetworks(false /*async*/, true /*show_hidden*/,
+                              false /*passive*/, 400 /*ms per channel*/);
     JsonDocument doc;
     JsonArray arr = doc.to<JsonArray>();
     for (int i = 0; i < n && i < 30; i++) {

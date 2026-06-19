@@ -56,6 +56,9 @@
   .field input,.field select{background:#0f1218;border:1px solid var(--line);color:var(--text);
     padding:8px 10px;border-radius:8px;font:inherit;width:140px;text-align:right}
   .field input[type=checkbox]{width:auto}
+  .durwrap{display:flex;gap:8px;align-items:center}
+  .durwrap #autoDur{width:84px}
+  .durwrap #autoUnit{width:88px;text-align:left}
   .slider{margin-top:14px}
   .slider-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
   .slider input[type=range]{width:100%;accent-color:var(--accent);height:26px;cursor:pointer}
@@ -108,12 +111,14 @@
   .dial .ring{fill:none;stroke:#0f1218;stroke-width:8}
   .dial .arc{fill:none;stroke:var(--pan);stroke-width:8;stroke-linecap:round}
   .dial .tick{stroke:var(--line);stroke-width:1}
+  .dial .zeroneedle{stroke:var(--accent);stroke-width:2;stroke-linecap:round;opacity:.85}
   .dial .needle{stroke:var(--ok);stroke-width:2;stroke-linecap:round}
   .dial .center{fill:var(--muted)}
   .dial .handle{fill:#e7ecf3;stroke:var(--pan);stroke-width:3;cursor:grab}
   .dial .handle.end{stroke:#caa6ff}
   .dial text{fill:var(--muted);font-size:10px}
   .dial .big{fill:var(--text);font-size:15px;font-weight:600}
+  .dial .htext{fill:var(--muted);font-size:10px;font-weight:600;dominant-baseline:central}
 
   .lock-overlay{position:fixed;inset:0;background:rgba(8,10,14,.85);backdrop-filter:blur(4px);
     display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:50}
@@ -181,11 +186,14 @@
         <svg id="dial" class="dial" width="220" height="220" viewBox="0 0 220 220">
           <circle class="ring" cx="110" cy="110" r="82"></circle>
           <path class="arc" id="panArc"></path>
+          <line class="zeroneedle" id="panZero" x1="110" y1="110" x2="110" y2="192"></line>
           <line class="needle" id="panNeedle" x1="110" y1="110" x2="110" y2="192"></line>
           <circle class="center" cx="110" cy="110" r="3"></circle>
-          <text id="panAngleTxt" class="big" x="110" y="150" text-anchor="middle">0°</text>
+          <text id="panAngleTxt" class="big" x="110" y="72" text-anchor="middle">0°</text>
           <circle class="handle start" id="panStartH" r="11" data-key="pStart"></circle>
           <circle class="handle end" id="panEndH" r="11" data-key="pEnd"></circle>
+          <text class="htext" id="panStartTxt" text-anchor="middle">start</text>
+          <text class="htext" id="panEndTxt" text-anchor="middle">end</text>
         </svg>
       </div>
       <div class="rangefields">
@@ -209,9 +217,16 @@
       <h2>Move</h2>
       <div class="field">
         <label>Travel time</label>
-        <input type="number" id="autoDur" min="1" max="3600" step="1" value="20">
+        <span class="durwrap">
+          <input type="number" id="autoDur" min="0" step="1" value="20">
+          <select id="autoUnit">
+            <option value="1">sec</option>
+            <option value="60">min</option>
+            <option value="3600">hour</option>
+          </select>
+        </span>
       </div>
-      <p class="small">seconds &mdash; enabled axes go from start to end together, finishing at the same time.</p>
+      <p class="small">Enabled axes go from start to end together, finishing at the same time.</p>
     </div>
     <div class="card">
       <h2>Axes in move</h2>
@@ -240,7 +255,7 @@
 
   <section id="tab-settings">
     <div class="card">
-      <h2>Slider — Mechanical <span class="axistag lin">LINEAR</span></h2>
+      <h2>Linear Axis <span class="axistag lin">LINEAR</span></h2>
       <div class="field">
         <label>mm per revolution</label>
         <input type="number" id="setMmPerRev" min="0.1" max="1000" step="0.1">
@@ -250,14 +265,6 @@
         <input type="number" id="setMaxTravel" min="10" max="2000" step="1">
       </div>
       <div class="field">
-        <label for="setInvertDir">Flip direction</label>
-        <label class="switch"><input type="checkbox" id="setInvertDir"><span class="track"></span></label>
-      </div>
-      <p class="small">mm the carriage travels per full motor turn. Flip direction if LEFT/RIGHT or homing run the wrong way.</p>
-    </div>
-    <div class="card">
-      <h2>Slider — Motion</h2>
-      <div class="field">
         <label>Max speed (mm/s)</label>
         <input type="number" id="setMaxSpeed" min="1" max="500" step="0.5">
       </div>
@@ -266,16 +273,21 @@
         <input type="number" id="setAccel" min="1" max="5000" step="1">
       </div>
       <div class="field">
-        <label for="setUseAccel">Smooth ramping</label>
-        <label class="switch"><input type="checkbox" id="setUseAccel"><span class="track"></span></label>
+        <label>Jog speed (mm/s)</label>
+        <input type="number" id="setJogSpeed" min="1" max="500" step="0.5">
       </div>
       <div class="field">
         <label>Homing speed (mm/s)</label>
         <input type="number" id="setHomingSpeed" min="1" max="500" step="0.5">
       </div>
+      <div class="field">
+        <label for="setInvertDir">Flip direction</label>
+        <label class="switch"><input type="checkbox" id="setInvertDir"><span class="track"></span></label>
+      </div>
+      <p class="small">mm the carriage travels per full motor turn. Jog speed sets how fast the Left/Right buttons move. Flip direction if LEFT/RIGHT or homing run the wrong way.</p>
     </div>
     <div class="card">
-      <h2>Pan — Rotary <span class="axistag rot">ROTARY</span></h2>
+      <h2>Rotary Axis <span class="axistag rot">ROTARY</span></h2>
       <div class="field">
         <label>Steps per 360&deg; turn</label>
         <input type="number" id="setPanStepsPerRev" min="1" max="60000" step="1">
@@ -289,25 +301,22 @@
         <input type="number" id="setPanAccel" min="1" max="10000" step="1">
       </div>
       <div class="field">
+        <label>Jog speed (&deg;/s)</label>
+        <input type="number" id="setPanJogSpeed" min="1" max="2000" step="1">
+      </div>
+      <div class="field">
         <label for="setPanInvertDir">Flip direction</label>
         <label class="switch"><input type="checkbox" id="setPanInvertDir"><span class="track"></span></label>
       </div>
       <p class="small">Steps for one full platform turn. Direct drive on a 1/16 NEMA 17 = 3200; raise it for a geared head.</p>
     </div>
     <div class="card">
-      <h2>Calibration <span class="axistag lin">LINEAR</span></h2>
-      <p class="small">Spin a known number of turns, measure the travel, then apply to set mm/turn precisely.</p>
+      <h2>Other Settings</h2>
       <div class="field">
-        <label>Turns to spin</label>
-        <input type="number" id="calTurns" min="0.1" max="100" step="0.1" value="2">
+        <label for="setUseAccel">Smooth ramping</label>
+        <label class="switch"><input type="checkbox" id="setUseAccel"><span class="track"></span></label>
       </div>
-      <button class="btn secondary" id="calSpin">&#9654; Spin</button>
-      <div class="field">
-        <label>Measured travel (mm)</label>
-        <input type="number" id="calMeasured" min="0.1" max="2000" step="0.1">
-      </div>
-      <button class="btn" id="calApply">Apply Calibration</button>
-      <p id="calMsg" class="small" style="margin-top:8px"></p>
+      <p class="small">Smooth ramping eases both axes in and out of motion (jog and auto). Turn it off for snappy, constant-speed moves with no acceleration.</p>
     </div>
     <button class="btn" id="settingsSave">Save Settings</button>
     <div class="card" style="margin-top:12px">
@@ -347,7 +356,7 @@ let pollFailures = 0;
 
 // Geometry / shot config, seeded from /api/settings.
 let cfg = { maxTravelMm:300, panMaxDeg:360, sStart:0, sEnd:300, pStart:0, pEnd:360,
-            maxSpeedMmS:50, panMaxSpeedDegS:90 };
+            maxSpeedMmS:50, panMaxSpeedDegS:90, jogSpeedMmS:30, panJogSpeedDegS:45 };
 let curMm = 0, curPan = 0;
 
 // ---- Tab switching ----
@@ -419,6 +428,10 @@ function polar(ang){ // 0° at bottom, clockwise (dial flipped 180°)
   const r = (ang + 90) * Math.PI / 180;
   return { x: DCX + DR*Math.cos(r), y: DCY + DR*Math.sin(r) };
 }
+function polarR(ang, rad){ // same mapping at an arbitrary radius (for labels)
+  const r = (ang + 90) * Math.PI / 180;
+  return { x: DCX + rad*Math.cos(r), y: DCY + rad*Math.sin(r) };
+}
 function angleAt(clientX, clientY){
   const svg = $('#dial');
   const r = svg.getBoundingClientRect();
@@ -440,6 +453,10 @@ function renderPan(){
   const ps = polar(cfg.pStart), pe = polar(cfg.pEnd);
   $('#panStartH').setAttribute('cx', ps.x); $('#panStartH').setAttribute('cy', ps.y);
   $('#panEndH').setAttribute('cx', pe.x);   $('#panEndH').setAttribute('cy', pe.y);
+  // start/end name labels, sitting just inside their handles
+  const ls = polarR(cfg.pStart, 60), le = polarR(cfg.pEnd, 60);
+  $('#panStartTxt').setAttribute('x', ls.x); $('#panStartTxt').setAttribute('y', ls.y);
+  $('#panEndTxt').setAttribute('x', le.x);   $('#panEndTxt').setAttribute('y', le.y);
   $('#panArc').setAttribute('d', arcPath(cfg.pStart, cfg.pEnd));
   $('#pStart').value = Math.round(cfg.pStart);
   $('#pEnd').value   = Math.round(cfg.pEnd);
@@ -489,10 +506,11 @@ $$('.miniact button[data-zero]').forEach(b => b.addEventListener('click', () => 
 }));
 
 // ---- Per-axis jog: press & hold (Left/Right under each path) ----
-const JOG_SPEED = { slider:30, pan:45 };   // axis units/s; clamped to the axis max
+// Jog speed comes from settings (clamped to the axis max speed).
 function bindJog(el, axis, dir) {
-  const speed = () => Math.min(JOG_SPEED[axis],
-    axis === 'pan' ? cfg.panMaxSpeedDegS : cfg.maxSpeedMmS);
+  const speed = () => (axis === 'pan')
+    ? Math.min(cfg.panJogSpeedDegS, cfg.panMaxSpeedDegS)
+    : Math.min(cfg.jogSpeedMmS, cfg.maxSpeedMmS);
   const start = e => { e.preventDefault(); post('/api/manual', {action:'start', axis, dir, speed:speed()}); };
   const stop  = e => { e.preventDefault(); post('/api/manual', {action:'stop', axis}); };
   el.addEventListener('mousedown', start);
@@ -552,11 +570,6 @@ async function poll() {
   mb.textContent = s.motors ? 'Disable Steppers' : 'Enable Steppers';
   mb.classList.toggle('off', !s.motors);
 
-  const spinning = s.stateRaw === 'CALIBRATE';
-  const cs = $('#calSpin');
-  cs.textContent = spinning ? '⏹ Stop' : '▶ Spin';
-  cs.classList.toggle('danger', spinning);
-
   const st = s.stateRaw;
   const isMoving = st === 'AUTO_MOVE' || st === 'AUTO_REPOSITION';
   const isPaused = st === 'AUTO_PAUSED';
@@ -592,7 +605,8 @@ $('#enRotary').addEventListener('change', updateAxisEnable);
 updateAxisEnable();
 
 $('#autoStart').addEventListener('click', () => {
-  const dur = parseFloat($('#autoDur').value) || 10;
+  const unit = parseFloat($('#autoUnit').value) || 1;   // 1=sec, 60=min, 3600=hour
+  const dur = (parseFloat($('#autoDur').value) || 0) * unit;   // seconds
   post('/api/auto', {
     action:'start', duration:dur,
     enLin: $('#enLinear').checked, enRot: $('#enRotary').checked,
@@ -614,6 +628,8 @@ async function loadSettings() {
   cfg.panMaxDeg   = s.panMaxDeg || 360;
   cfg.maxSpeedMmS     = s.maxSpeedMmS || 50;
   cfg.panMaxSpeedDegS = s.panMaxSpeedDegS || 90;
+  cfg.jogSpeedMmS     = s.jogSpeedMmS || 30;
+  cfg.panJogSpeedDegS = s.panJogSpeedDegS || 45;
   cfg.sStart = clamp(s.startMm, 0, cfg.maxTravelMm);
   cfg.sEnd   = clamp(s.endMm,   0, cfg.maxTravelMm);
   cfg.pStart = clamp(s.panStartDeg, 0, cfg.panMaxDeg);
@@ -624,12 +640,14 @@ async function loadSettings() {
   $('#setMaxTravel').value    = s.maxTravelMm;
   $('#setMaxSpeed').value     = s.maxSpeedMmS;
   $('#setAccel').value        = s.accelMmS2;
+  $('#setJogSpeed').value     = s.jogSpeedMmS;
   $('#setHomingSpeed').value  = s.homingSpeedMmS;
   $('#setUseAccel').checked   = s.useAccel;
   $('#setInvertDir').checked  = s.invertDir;
   $('#setPanStepsPerRev').value = s.panStepsPerRev;
   $('#setPanMaxSpeed').value    = s.panMaxSpeedDegS;
   $('#setPanAccel').value       = s.panAccelDegS2;
+  $('#setPanJogSpeed').value    = s.panJogSpeedDegS;
   $('#setPanInvertDir').checked = s.panInvertDir;
 }
 $('#settingsSave').addEventListener('click', async () => {
@@ -638,6 +656,7 @@ $('#settingsSave').addEventListener('click', async () => {
     maxTravelMm:    parseFloat($('#setMaxTravel').value),
     maxSpeedMmS:    parseFloat($('#setMaxSpeed').value),
     accelMmS2:      parseFloat($('#setAccel').value),
+    jogSpeedMmS:    parseFloat($('#setJogSpeed').value),
     homingSpeedMmS: parseFloat($('#setHomingSpeed').value),
     useAccel:       $('#setUseAccel').checked,
     invertDir:      $('#setInvertDir').checked,
@@ -645,6 +664,7 @@ $('#settingsSave').addEventListener('click', async () => {
     panStepsPerRev: parseInt($('#setPanStepsPerRev').value),
     panMaxSpeedDegS:parseFloat($('#setPanMaxSpeed').value),
     panAccelDegS2:  parseFloat($('#setPanAccel').value),
+    panJogSpeedDegS:parseFloat($('#setPanJogSpeed').value),
     panInvertDir:   $('#setPanInvertDir').checked,
     panStartDeg:    cfg.pStart, panEndDeg: cfg.pEnd
   };
@@ -654,28 +674,6 @@ $('#settingsSave').addEventListener('click', async () => {
   if (r) loadSettings();
 });
 loadSettings();
-
-// ---- Calibration ----
-$('#calSpin').addEventListener('click', async () => {
-  if (state.stateRaw === 'CALIBRATE') { await post('/api/estop'); $('#calMsg').textContent='Stopped.'; return; }
-  const turns = parseFloat($('#calTurns').value) || 0;
-  if (turns <= 0) { $('#calMsg').textContent = 'Enter a turn count first.'; return; }
-  $('#calMsg').textContent = 'Spinning ' + turns + ' turn(s)... press Stop to abort.';
-  const r = await post('/api/calibrate', {action:'spin', turns});
-  if (!r) $('#calMsg').textContent = 'Could not spin. Home or skip homing first, and wait until idle.';
-});
-$('#calApply').addEventListener('click', async () => {
-  const turns = parseFloat($('#calTurns').value) || 0;
-  const measured = parseFloat($('#calMeasured').value) || 0;
-  if (turns <= 0 || measured <= 0) { $('#calMsg').textContent = 'Enter turns and measured mm first.'; return; }
-  const r = await post('/api/calibrate', {action:'apply', turns, measured});
-  if (r && r.ok) {
-    $('#calMsg').textContent = 'Calibrated ✓  steps/mm = ' + r.stepsPerMm.toFixed(2) + ', mm/turn = ' + r.mmPerRev.toFixed(3);
-    loadSettings();
-  } else {
-    $('#calMsg').textContent = 'Calibration rejected (resulting steps/mm out of range).';
-  }
-});
 
 // ---- Network ----
 async function loadWifiStatus() {

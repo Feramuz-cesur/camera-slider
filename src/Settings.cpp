@@ -4,7 +4,7 @@
 
 #define EEPROM_SIZE     128
 #define EEPROM_ADDR     0
-#define SETTINGS_MAGIC  0xCA19   // v5: added rotary pan axis + start/end positions
+#define SETTINGS_MAGIC  0xCA1A   // v6: added per-axis jog speeds
 
 SliderSettings settings;
 
@@ -26,6 +26,7 @@ void Settings_loadDefaults() {
     settings.maxTravelMm  = DEFAULT_MAX_TRAVEL_MM;
     settings.maxSpeedMmS  = DEFAULT_MAX_SPEED_MMS;
     settings.accelMmS2    = DEFAULT_ACCEL_MMS2;
+    settings.jogSpeedMmS  = DEFAULT_JOG_SPEED_MMS;
     settings.homingSpeedMmS = DEFAULT_HOMING_SPEED_MMS;
     settings.useAccel     = DEFAULT_USE_ACCEL;
     settings.invertDir    = DEFAULT_INVERT_DIR;
@@ -35,6 +36,7 @@ void Settings_loadDefaults() {
     settings.panStepsPerRev = DEFAULT_PAN_STEPS_PER_REV;
     settings.panMaxSpeedDegS = DEFAULT_PAN_MAX_SPEED_DEGS;
     settings.panAccelDegS2   = DEFAULT_PAN_ACCEL_DEGS2;
+    settings.panJogSpeedDegS = DEFAULT_PAN_JOG_SPEED_DEGS;
     settings.panInvertDir    = DEFAULT_PAN_INVERT_DIR;
     settings.panStartDeg     = DEFAULT_PAN_START_DEG;
     settings.panEndDeg       = DEFAULT_PAN_END_DEG;
