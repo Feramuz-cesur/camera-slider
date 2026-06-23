@@ -14,6 +14,12 @@ static WebServer        server(80);   // serves the page + settings/wifi (reques
 static WebSocketsServer ws(81);       // live status push + low-latency control commands
 static uint32_t g_rebootAt = 0;       // 0 = no pending reboot
 
+// Timelapse/layer mode (driven by the mobile app). The print's total layer count
+// arrives once via "layerSetup"; each "layer" message maps the current layer to a
+// position between the configured start and end on BOTH axes. 0 = no print set up.
+static uint16_t g_layerTotal   = 0;
+static uint16_t g_layerCurrent = 0;
+
 // Detailed state token used by our web UI
 static const char* stateShortName(SliderState s) {
     switch (s) {
@@ -26,6 +32,7 @@ static const char* stateShortName(SliderState s) {
         case STATE_AUTO_REPOSITION: return "AUTO_REPOSITION";
         case STATE_AUTO_MOVE:       return "AUTO_MOVE";
         case STATE_AUTO_PAUSED:     return "AUTO_PAUSED";
+        case STATE_LAYER_MOVE:      return "LAYER_MOVE";
         case STATE_CALIBRATE:       return "CALIBRATE";
         case STATE_FAULT:           return "FAULT";
     }
@@ -56,6 +63,8 @@ static void buildStatus(String& out) {
     doc["homed"]     = Slider_isHomed();
     doc["motors"]    = Slider_motorsEnabled();
     doc["progress"]  = Slider_autoProgress();
+    doc["layerTotal"]   = g_layerTotal;     // 0 = no print configured
+    doc["layerCurrent"] = g_layerCurrent;   // last layer commanded
     serializeJson(doc, out);
 }
 
@@ -65,9 +74,22 @@ static void broadcastStatus() {
     ws.broadcastTXT(out);
 }
 
+// Reply to a single client with a rejection. Most commands are fire-and-forget
+// (their result shows up in the next status push), but motion commands that we
+// refuse — e.g. before homing — return an explicit error so the mobile app can
+// react instead of silently doing nothing.
+static void sendError(uint8_t num, const char* code) {
+    JsonDocument doc;
+    doc["t"]    = "error";
+    doc["code"] = code;
+    String out;
+    serializeJson(doc, out);
+    ws.sendTXT(num, out);
+}
+
 // One inbound command frame. Commands are fire-and-forget: the result shows up
-// in the next status push, so we send no per-command reply.
-static void handleWsText(uint8_t* payload, size_t length) {
+// in the next status push, so we send no per-command reply (except errors).
+static void handleWsText(uint8_t num, uint8_t* payload, size_t length) {
     JsonDocument doc;
     if (deserializeJson(doc, (const char*)payload, length)) return;
     const char* t = doc["t"] | "";
@@ -129,13 +151,41 @@ static void handleWsText(uint8_t* payload, size_t length) {
         } else if (strcmp(action, "resume") == 0) {
             Slider_resumeAuto();
         }
+    } else if (strcmp(t, "layerSetup") == 0) {
+        // Print started: remember the total layer count. No movement here.
+        int total = doc["total"] | 0;
+        if (total < 1) { sendError(num, "BAD_TOTAL"); return; }
+        g_layerTotal   = (uint16_t)total;
+        g_layerCurrent = 0;
+    } else if (strcmp(t, "layer") == 0) {
+        // Layer changed: map layer n -> position on both axes and move there.
+        if (g_layerTotal < 1)       { sendError(num, "NO_SETUP");  return; }
+        if (!Slider_isHomed())      { sendError(num, "NOT_HOMED"); return; }
+        int n = doc["n"] | 0;
+        if (n < 1) n = 1;
+        if (n > g_layerTotal) n = g_layerTotal;
+        // layer 1 -> start, layer total -> end (single layer stays at start).
+        float frac = (g_layerTotal > 1) ? (float)(n - 1) / (float)(g_layerTotal - 1) : 0.0f;
+        float sPos = settings.startMm     + (settings.endMm     - settings.startMm)     * frac;
+        float pPos = settings.panStartDeg + (settings.panEndDeg - settings.panStartDeg) * frac;
+        if (!Slider_gotoBoth(sPos, pPos)) { sendError(num, "BUSY"); return; }
+        g_layerCurrent = (uint16_t)n;
+    } else if (strcmp(t, "gostart") == 0) {
+        // Button 1: send both axes to their configured start positions.
+        if (!Slider_isHomed()) { sendError(num, "NOT_HOMED"); return; }
+        if (!Slider_gotoBoth(settings.startMm, settings.panStartDeg)) { sendError(num, "BUSY"); return; }
+    } else if (strcmp(t, "simulate") == 0) {
+        // Button 2: preview the move using the normal auto mode (default 25 s).
+        if (!Slider_isHomed()) { sendError(num, "NOT_HOMED"); return; }
+        float duration = doc["duration"] | 25.0f;
+        if (!Slider_startAuto(duration, true, true)) { sendError(num, "BUSY"); return; }
     }
     broadcastStatus();   // reflect the command immediately
 }
 
 static void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
     if (type == WStype_TEXT) {
-        handleWsText(payload, length);
+        handleWsText(num, payload, length);
     } else if (type == WStype_CONNECTED) {
         String out;
         buildStatus(out);

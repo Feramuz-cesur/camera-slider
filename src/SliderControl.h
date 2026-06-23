@@ -11,6 +11,7 @@ enum SliderState {
     STATE_AUTO_REPOSITION,  // going to start of auto move
     STATE_AUTO_MOVE,        // executing the timed auto move
     STATE_AUTO_PAUSED,      // auto move paused (resumable)
+    STATE_LAYER_MOVE,       // timelapse/layer mode: both axes seeking a target
     STATE_CALIBRATE,        // spinning a fixed number of steps for calibration
     STATE_FAULT
 };
@@ -59,6 +60,11 @@ bool Slider_setZero(AxisId axis);
 bool Slider_gotoPos(AxisId axis, float pos);
 // Convenience wrapper kept for external apps (PrintLapse): linear axis only.
 bool Slider_gotoMm(float mm);
+
+// Move BOTH axes simultaneously to absolute targets (slider mm, pan deg), each at
+// its own max speed/accel. Used by the mobile timelapse/layer mode and the
+// "go to start" command. Non-blocking; returns true if accepted.
+bool Slider_gotoBoth(float sliderMm, float panDeg);
 
 // Auto move: both axes travel from their configured start->end position
 // (settings.startMm/endMm and settings.panStartDeg/panEndDeg) simultaneously,
