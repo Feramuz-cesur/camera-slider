@@ -38,8 +38,12 @@
 
 // ---------- WiFi Access Point (fallback / provisioning) ----------
 #define AP_SSID         "CameraSlider"
-#define AP_PASSWORD     "slider1234"     // min 8 chars
+#define AP_PASSWORD     "12345678"     // min 8 chars
 #define AP_CHANNEL      6
+// ESP32-C3 0.42" OLED boards have a badly matched PCB antenna: at the default
+// ~20 dBm the RF output distorts and clients cannot complete association with
+// the AP (and STA connects get flaky). ~8.5 dBm is the widely used sweet spot.
+#define WIFI_TX_POWER   WIFI_POWER_8_5dBm
 
 // ---------- WiFi Station (connect to your network) ----------
 #define WIFI_STA_TIMEOUT_MS  15000       // give up after this and fall back to AP
@@ -60,7 +64,7 @@
 #define DEFAULT_ACCEL_MMS2      80.0f
 #define DEFAULT_JOG_SPEED_MMS   30.0f    // manual jog speed (mm/s)
 #define DEFAULT_HOMING_SPEED_MMS 10.0f   // approach speed toward the limit switch
-#define DEFAULT_USE_ACCEL       true
+#define DEFAULT_USE_ACCEL       false
 #define DEFAULT_INVERT_DIR      false
 
 // Auto-move start/end for the linear axis (mm). Defaults span the full rail.

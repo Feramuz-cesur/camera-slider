@@ -31,6 +31,9 @@ static void startAP() {
     // Keep the radio always on - this is the single biggest AP responsiveness win.
     WiFi.setSleep(false);
     WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL);
+    // Must come after softAP() (radio has to be started first). See Config.h:
+    // full TX power breaks association on this board's PCB antenna.
+    WiFi.setTxPower(WIFI_TX_POWER);
     // Captive portal: answer every DNS query with our own IP so the phone's
     // "is there internet?" probe hits us and auto-opens the interface.
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
@@ -48,6 +51,7 @@ void Wifi_begin() {
         WiFi.mode(WIFI_STA);
         WiFi.setSleep(false);   // lower request latency, snappier web UI
         WiFi.begin(ssid.c_str(), pass.c_str());
+        WiFi.setTxPower(WIFI_TX_POWER);   // after begin(); see Config.h note
 
         uint32_t start = millis();
         while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_STA_TIMEOUT_MS) {

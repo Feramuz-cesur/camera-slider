@@ -35,7 +35,8 @@
   nav button{flex:1;background:none;border:0;color:var(--muted);padding:14px 0;font:inherit;
     border-bottom:2px solid transparent;cursor:pointer}
   nav button.active{color:var(--text);border-bottom-color:var(--accent)}
-  main{padding:16px;max-width:520px;margin:0 auto}
+  main{padding:16px;max-width:520px;margin:0 auto;
+    padding-bottom:calc(84px + env(safe-area-inset-bottom))}
   section{display:none}
   section.active{display:block}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
@@ -92,8 +93,6 @@
   .miniact button:active{background:var(--accent2)}
   .miniact button.jogbtn{font-weight:600}
   .miniact.rot button.jogbtn:active{background:var(--pan2)}
-  .miniact button.zero{background:#161b27;color:var(--muted)}
-  .miniact button.zero:active{background:var(--accent2);color:#fff}
 
   /* ---- Toggle switch (settings) ---- */
   .switch{position:relative;display:inline-block;width:46px;height:26px;flex:none}
@@ -119,6 +118,22 @@
   .dial text{fill:var(--muted);font-size:10px}
   .dial .big{fill:var(--text);font-size:15px;font-weight:600}
   .dial .htext{fill:var(--muted);font-size:10px;font-weight:600;dominant-baseline:central}
+
+  /* ---- Small coordinate-origin icon (re-home / use-as buttons) ---- */
+  .axicon{width:16px;height:16px;vertical-align:-3px;margin-right:6px}
+
+  /* ---- Fixed bottom bar: capture current pose as start/end ---- */
+  .setbar{position:fixed;bottom:0;left:0;right:0;z-index:40;
+    display:flex;gap:10px;justify-content:center;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:rgba(14,16,20,.55);backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+  .setbar button{flex:1;max-width:244px;padding:13px 0;border-radius:10px;
+    border:1px solid var(--line);background:#1d2230;color:var(--text);
+    font:inherit;font-weight:600;cursor:pointer;touch-action:manipulation}
+  .setbar button:active{background:var(--accent2)}
+  .setbar.hidden{display:none}
+  body:has(.setbar.hidden) main{padding-bottom:16px}
 
   .lock-overlay{position:fixed;inset:0;background:rgba(8,10,14,.85);backdrop-filter:blur(4px);
     display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:50}
@@ -174,10 +189,6 @@
         <button class="jogbtn" data-jog="slider" data-dir="left">&#9664; Left</button>
         <button class="jogbtn" data-jog="slider" data-dir="right">Right &#9654;</button>
       </div>
-      <div class="miniact">
-        <button class="zero" data-zero="accept" data-axis="slider">Accept zero</button>
-        <button class="zero" data-zero="go" data-axis="slider">Go zero</button>
-      </div>
     </div>
 
     <div class="card">
@@ -207,9 +218,6 @@
       <div class="miniact rot">
         <button class="jogbtn" data-jog="pan" data-dir="left">&#8634; CCW</button>
         <button class="jogbtn" data-jog="pan" data-dir="right">CW &#8635;</button>
-      </div>
-      <div class="miniact">
-        <button class="zero" data-zero="accept" data-axis="pan">Accept zero</button>
       </div>
     </div>
 
@@ -248,8 +256,15 @@
     <div class="card" style="margin-top:12px">
       <h2>Quick Actions</h2>
       <button class="btn motorsbtn" id="motorsBtn">Disable Steppers</button>
-      <button class="btn secondary" id="rehome">Re-Home Slider</button>
-      <p class="hint">Steppers stay energized (holding torque) by default. Disable to release them so the rig can be moved by hand; any move re-enables them. Use the per-axis Left/Right to jog (press &amp; hold), Accept zero to set the current spot as 0, Go zero to return.</p>
+      <button class="btn secondary" id="rehome">
+        <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
+        Re-Home Linear
+      </button>
+      <button class="btn secondary" id="rehomeRot">
+        <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
+        Re-Home Rotary
+      </button>
+      <p class="hint">Steppers stay energized (holding torque) by default. Disable to release them so the rig can be moved by hand; any move re-enables them. Re-Home Linear runs the limit-switch homing to find the linear 0; Re-Home Rotary sets the current pan angle as 0&deg;.</p>
     </div>
   </section>
 
@@ -317,8 +332,8 @@
         <label class="switch"><input type="checkbox" id="setUseAccel"><span class="track"></span></label>
       </div>
       <p class="small">Smooth ramping eases both axes in and out of motion (jog and auto). Turn it off for snappy, constant-speed moves with no acceleration.</p>
+      <p class="small" id="saveMsg" style="margin-top:8px">All changes are saved automatically.</p>
     </div>
-    <button class="btn" id="settingsSave">Save Settings</button>
     <div class="card" style="margin-top:12px">
       <h2>Network</h2>
       <div class="row"><span class="label">Connected to</span><span id="wifiSsid" class="val">&mdash;</span></div>
@@ -330,6 +345,17 @@
   </section>
 
 </main>
+
+<div class="setbar">
+  <button id="useStart">
+    <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
+    Use as Start
+  </button>
+  <button id="useEnd">
+    <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
+    Use as End
+  </button>
+</div>
 
 <div id="lockOverlay" class="lock-overlay">
   <h2>Homing</h2>
@@ -358,6 +384,8 @@ $$('nav button').forEach(b => b.addEventListener('click', () => {
   $$('main section').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   $('#tab-' + b.dataset.tab).classList.add('active');
+  // The capture-pose bar only makes sense on the Auto screen.
+  $('.setbar').classList.toggle('hidden', b.dataset.tab !== 'auto');
 }));
 
 // ---- API helper ----
@@ -413,6 +441,7 @@ function dragThumb(el, key){
   const up = () => {
     document.removeEventListener('pointermove', move);
     document.removeEventListener('pointerup', up);
+    scheduleSave();   // persist the new range on the ESP32 when the drag ends
   };
   el.addEventListener('pointerdown', e => {
     e.preventDefault();
@@ -422,8 +451,8 @@ function dragThumb(el, key){
 }
 dragThumb($('#linStart'), 'sStart');
 dragThumb($('#linEnd'), 'sEnd');
-$('#sStart').addEventListener('input', e => { cfg.sStart = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); });
-$('#sEnd').addEventListener('input',  e => { cfg.sEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); });
+$('#sStart').addEventListener('input', e => { cfg.sStart = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); scheduleSave(); });
+$('#sEnd').addEventListener('input',  e => { cfg.sEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); scheduleSave(); });
 
 /* =========================================================
    Rotary dual-thumb dial
@@ -482,6 +511,7 @@ function dragHandle(el, key){
   const up = () => {
     document.removeEventListener('pointermove', move);
     document.removeEventListener('pointerup', up);
+    scheduleSave();   // persist the new range on the ESP32 when the drag ends
   };
   el.addEventListener('pointerdown', e => {
     e.preventDefault();
@@ -491,8 +521,8 @@ function dragHandle(el, key){
 }
 dragHandle($('#panStartH'), 'pStart');
 dragHandle($('#panEndH'), 'pEnd');
-$('#pStart').addEventListener('input', e => { cfg.pStart = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); });
-$('#pEnd').addEventListener('input',  e => { cfg.pEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); });
+$('#pStart').addEventListener('input', e => { cfg.pStart = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); scheduleSave(); });
+$('#pEnd').addEventListener('input',  e => { cfg.pEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); scheduleSave(); });
 
 // ---- Go-to start/end buttons ----
 $$('.miniact button[data-edge]').forEach(b => b.addEventListener('click', () => {
@@ -503,12 +533,18 @@ $$('.miniact button[data-edge]').forEach(b => b.addEventListener('click', () => 
   wsSend({ t:'goto', axis, pos });
 }));
 
-// ---- Accept zero (set current as origin) / Go zero ----
-$$('.miniact button[data-zero]').forEach(b => b.addEventListener('click', () => {
-  const axis = b.dataset.axis;
-  if (b.dataset.zero === 'go') wsSend({ t:'goto', axis, pos:0 });
-  else                         wsSend({ t:'setzero', axis });
-}));
+// ---- Use current pose as start / end (fixed bottom bar) ----
+// Captures the live position of BOTH axes and pushes it to the ESP32.
+$('#useStart').addEventListener('click', () => {
+  cfg.sStart = clamp(Math.round(curMm), 0, cfg.maxTravelMm);
+  cfg.pStart = clamp(Math.round(curPan), 0, cfg.panMaxDeg);
+  renderLin(); renderPan(); scheduleSave();
+});
+$('#useEnd').addEventListener('click', () => {
+  cfg.sEnd = clamp(Math.round(curMm), 0, cfg.maxTravelMm);
+  cfg.pEnd = clamp(Math.round(curPan), 0, cfg.panMaxDeg);
+  renderLin(); renderPan(); scheduleSave();
+});
 
 // ---- Per-axis jog: press & hold (Left/Right under each path) ----
 // Jog speed comes from settings (clamped to the axis max speed).
@@ -579,7 +615,8 @@ $('#skipHomeBtn').addEventListener('click', () => wsSend({ t:'skiphome' }));
 $('#stopHomeBtn').addEventListener('click', () => wsSend({ t:'estop' }));
 
 $('#motorsBtn').addEventListener('click', () => wsSend({ t:'motors', enabled: !state.motors }));
-$('#rehome').addEventListener('click', () => wsSend({ t:'home' }));
+$('#rehome').addEventListener('click', () => wsSend({ t:'home' }));                       // linear: limit-switch homing
+$('#rehomeRot').addEventListener('click', () => wsSend({ t:'setzero', axis:'pan' }));     // rotary: current angle becomes 0°
 
 // ---- Auto move ----
 // Per-axis enable toggles: leave an axis out of the move, and disable Start
@@ -637,29 +674,55 @@ async function loadSettings() {
   $('#setPanJogSpeed').value    = s.panJogSpeedDegS;
   $('#setPanInvertDir').checked = s.panInvertDir;
 }
-$('#settingsSave').addEventListener('click', async () => {
+// Autosave: every change is pushed to the ESP32 (which persists it in EEPROM)
+// after a short debounce — no Save button needed. Number fields that are empty
+// or mid-edit (NaN) are simply left out; the firmware keeps its current value.
+let saveTimer = null;
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveSettings, 400); }
+
+function numVal(sel){ const v = parseFloat($(sel).value); return isNaN(v) ? undefined : v; }
+async function saveSettings(){
   const payload = {
-    mmPerRev:       parseFloat($('#setMmPerRev').value),
-    maxTravelMm:    parseFloat($('#setMaxTravel').value),
-    maxSpeedMmS:    parseFloat($('#setMaxSpeed').value),
-    accelMmS2:      parseFloat($('#setAccel').value),
-    jogSpeedMmS:    parseFloat($('#setJogSpeed').value),
-    homingSpeedMmS: parseFloat($('#setHomingSpeed').value),
+    mmPerRev:       numVal('#setMmPerRev'),
+    maxTravelMm:    numVal('#setMaxTravel'),
+    maxSpeedMmS:    numVal('#setMaxSpeed'),
+    accelMmS2:      numVal('#setAccel'),
+    jogSpeedMmS:    numVal('#setJogSpeed'),
+    homingSpeedMmS: numVal('#setHomingSpeed'),
     useAccel:       $('#setUseAccel').checked,
     invertDir:      $('#setInvertDir').checked,
     startMm:        cfg.sStart, endMm: cfg.sEnd,
-    panStepsPerRev: parseInt($('#setPanStepsPerRev').value),
-    panMaxSpeedDegS:parseFloat($('#setPanMaxSpeed').value),
-    panAccelDegS2:  parseFloat($('#setPanAccel').value),
-    panJogSpeedDegS:parseFloat($('#setPanJogSpeed').value),
+    panStepsPerRev: numVal('#setPanStepsPerRev'),
+    panMaxSpeedDegS:numVal('#setPanMaxSpeed'),
+    panAccelDegS2:  numVal('#setPanAccel'),
+    panJogSpeedDegS:numVal('#setPanJogSpeed'),
     panInvertDir:   $('#setPanInvertDir').checked,
     panStartDeg:    cfg.pStart, panEndDeg: cfg.pEnd
   };
+  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
   const r = await post('/api/settings', payload);
-  $('#settingsSave').textContent = r ? 'Saved ✓' : 'Save failed';
-  setTimeout(() => $('#settingsSave').textContent = 'Save Settings', 1500);
-  if (r) loadSettings();
-});
+  const msg = $('#saveMsg');
+  msg.textContent = r ? 'Saved ✓' : 'Save failed — check values';
+  msg.style.color = r ? 'var(--ok)' : 'var(--bad)';
+  clearTimeout(saveSettings._t);
+  saveSettings._t = setTimeout(() => { msg.textContent = 'All changes are saved automatically.'; msg.style.color = ''; }, 2000);
+  if (r) {
+    // Mirror values that other UI parts rely on (ranges, jog speeds).
+    if (payload.maxTravelMm) {
+      cfg.maxTravelMm = payload.maxTravelMm;
+      cfg.sStart = clamp(cfg.sStart, 0, cfg.maxTravelMm);
+      cfg.sEnd   = clamp(cfg.sEnd,   0, cfg.maxTravelMm);
+      renderLin();
+    }
+    if (payload.maxSpeedMmS)     cfg.maxSpeedMmS     = payload.maxSpeedMmS;
+    if (payload.panMaxSpeedDegS) cfg.panMaxSpeedDegS = payload.panMaxSpeedDegS;
+    if (payload.jogSpeedMmS)     cfg.jogSpeedMmS     = payload.jogSpeedMmS;
+    if (payload.panJogSpeedDegS) cfg.panJogSpeedDegS = payload.panJogSpeedDegS;
+  }
+}
+// Any edit on the Settings tab triggers an autosave ('change' fires on blur/
+// enter for numbers and immediately for the toggles).
+$$('#tab-settings input').forEach(el => el.addEventListener('change', scheduleSave));
 loadSettings();
 
 // ---- Network ----
