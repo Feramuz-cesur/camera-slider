@@ -1,4 +1,4 @@
-# Camera Slider — Fergineer Slider
+# Camera Slider
 
 ESP32-C3 tabanlı, WiFi üzerinden kontrol edilen 2 eksenli motorlu kamera slider'ı.
 Lineer eksen kamerayı GT2 kayışlı bir ray üzerinde taşır, rotary (pan) eksen ise
