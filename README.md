@@ -73,6 +73,36 @@ https://github.com/user-attachments/assets/d8921941-d690-4528-93d0-fbbbbc627310
 [Frame 2.pdf](https://github.com/user-attachments/files/31151425/Frame.2.pdf)
 
 
+### 3D baskı parçaları
+
+Basılması gereken tüm parçaların STL dosyaları [`3d-models/`](3d-models/)
+klasöründe:
+
+```
+3d-models/
+├── slider/           Projeye özel parçalar (motor yatakları, araba, kayış tutucu vb.)
+└── telefon-tutucu/   Telefon tutucu modülleri (harici tasarım — aşağıya bakın)
+```
+
+Önerilen baskı ayarları ve parça listesi için [`3d-models/README.md`](3d-models/README.md)
+dosyasına bakın.
+
+#### Telefon tutucu — atıf
+
+`3d-models/telefon-tutucu/` klasöründeki modeller **bana ait değildir**.
+Bu parçalar [HeyVye](https://www.thingiverse.com/thing:2194278) tarafından
+tasarlanan **Modular Mounting System** projesine aittir ve Creative Commons —
+Attribution (CC BY) lisansıyla yayınlanmıştır.
+
+Bu modelleri kendim tasarlamadım; projede yalnızca **destekleyici bir eleman**
+olarak kullandım ve kullanıcı tek tek aramak zorunda kalmasın diye orijinal
+kaynaktan indirip repoya ekledim. Tasarımın tüm emeği ve hakları orijinal
+tasarımcıya aittir.
+
+**Bu kısmın montajı için orijinal tasarımcının sayfasındaki talimatları
+uygulayabilirsiniz:** https://www.thingiverse.com/thing:2194278
+(Modüller M5 cıvata/somun ile birleşir, bağlantı noktası GoPro uyumludur.)
+
 ## Mekanik / kalibrasyon varsayılanları
 
 - Lineer: 200 adım/tur × 16 mikro adım = 3200 adım/tur; GT2 20T kasnak (40 mm/tur) → **80 adım/mm**
@@ -98,5 +128,11 @@ Bağlanınca açılan sayfadan ev ağı bilgileri girilir; sonrasında cihaza
 src/            Firmware kaynak kodu (Config.h: tüm pin ve varsayılan ayarlar)
 data/           Web arayüzü (LittleFS'e yüklenir)
 docs/           Bağlantı şeması (PNG + PDF, Fritzing çizimi)
+3d-models/      Basılacak parçaların STL dosyaları
 platformio.ini  Derleme yapılandırması
 ```
+
+## Teşekkür
+
+- Telefon tutucu modülleri: **Modular Mounting System** — [HeyVye](https://www.thingiverse.com/thing:2194278) (CC BY)
+- Adım üretimi: [FastAccelStepper](https://github.com/gin66/FastAccelStepper) — gin66
