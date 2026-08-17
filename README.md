@@ -58,6 +58,21 @@ Yüksek çözünürlüklü PDF: [docs/baglanti-semasi.pdf](docs/baglanti-semasi.
 
 **Kaçınılacak pinler:** GPIO2, GPIO8, GPIO9 (strapping/BOOT), GPIO18/19 (USB D−/D+), GPIO11–17 (flash).
 
+## Montaj bilgileri
+
+https://github.com/user-attachments/assets/d8921941-d690-4528-93d0-fbbbbc627310
+
+<img width="1466" height="2074" alt="Frame 1" src="https://github.com/user-attachments/assets/ec740015-4355-45ba-8490-a4e8b3fd0109" />
+
+
+[Frame 1.pdf](https://github.com/user-attachments/files/31151227/Frame.1.pdf)
+
+
+<img width="1465" height="2074" alt="Frame 2" src="https://github.com/user-attachments/assets/8a91249f-68a4-4359-85e3-f160da155c34" />
+
+[Frame 2.pdf](https://github.com/user-attachments/files/31151425/Frame.2.pdf)
+
+
 ## Mekanik / kalibrasyon varsayılanları
 
 - Lineer: 200 adım/tur × 16 mikro adım = 3200 adım/tur; GT2 20T kasnak (40 mm/tur) → **80 adım/mm**
