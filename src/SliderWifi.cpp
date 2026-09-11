@@ -11,6 +11,11 @@ static bool       g_sta = false;
 static bool       g_ap  = false;
 static DNSServer  dnsServer;   // captive portal: resolves every host to the AP IP
 
+// Async scan state (see Config.h for why a blocking scan is not an option).
+static String     g_scanJson = "[]";   // last completed result, ready to serve
+static bool       g_scanBusy = false;
+static uint32_t   g_scanDone = 0;      // millis() when the last scan finished (0 = never)
+
 static bool loadCreds(String& ssid, String& pass) {
     File f = LittleFS.open(WIFI_CREDS_FILE, "r");
     if (!f) return false;
@@ -73,6 +78,44 @@ void Wifi_begin() {
     startAP();
 }
 
+// ---------- Async network scan ----------
+void Wifi_scanStart() {
+    if (g_scanBusy) return;
+    // Rate-limit: every sweep still takes the radio off the AP channel for ~2 s,
+    // so a page that asks for a refresh in a tight loop must not be able to
+    // keep the AP permanently off-channel.
+    if (g_scanDone && millis() - g_scanDone < WIFI_SCAN_MIN_PERIOD_MS) return;
+    if (WiFi.scanNetworks(true /*async*/, false /*hidden*/, false /*active*/,
+                          WIFI_SCAN_DWELL_MS) == WIFI_SCAN_RUNNING) {
+        g_scanBusy = true;
+    }
+}
+
+bool          Wifi_scanBusy() { return g_scanBusy; }
+const String& Wifi_scanJson() { return g_scanJson; }
+
+// Called from Wifi_loop() while a scan is in flight.
+static void collectScan() {
+    int16_t n = WiFi.scanComplete();
+    if (n == WIFI_SCAN_RUNNING) return;
+
+    g_scanBusy = false;
+    g_scanDone = millis();
+    if (n < 0) return;   // failed - keep whatever list we already had
+
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    for (int i = 0; i < n && i < WIFI_SCAN_MAX_RESULTS; i++) {
+        JsonObject o = arr.add<JsonObject>();
+        o["ssid"] = WiFi.SSID(i);
+        o["rssi"] = WiFi.RSSI(i);
+        o["lock"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+    }
+    g_scanJson = "";
+    serializeJson(doc, g_scanJson);
+    WiFi.scanDelete();
+}
+
 bool Wifi_saveCreds(const String& ssid, const String& pass) {
     JsonDocument d;
     d["ssid"] = ssid;
@@ -94,6 +137,7 @@ String Wifi_ip()        { return g_sta ? WiFi.localIP().toString() : WiFi.softAP
 String Wifi_ssid()      { return g_sta ? WiFi.SSID() : String(AP_SSID); }
 
 void Wifi_loop() {
-    if (g_ap)  dnsServer.processNextRequest();
+    if (g_ap)       dnsServer.processNextRequest();
+    if (g_scanBusy) collectScan();
     // ESP32 mDNS runs in its own task; no update() call needed.
 }

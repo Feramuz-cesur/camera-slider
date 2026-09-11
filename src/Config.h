@@ -45,6 +45,16 @@
 // the AP (and STA connects get flaky). ~8.5 dBm is the widely used sweet spot.
 #define WIFI_TX_POWER   WIFI_POWER_8_5dBm
 
+// ---------- WiFi scan (provisioning page) ----------
+// The scan is run ASYNCHRONOUSLY and cached. A blocking scan parks the radio on
+// every channel in turn, so for dwell x ~14 channels the AP is off its own
+// channel: associated clients stop hearing beacons, new clients cannot complete
+// association, and neither the captive-portal DNS nor the web server answers.
+// That is what made the portal look "connected but dead" right after opening it.
+#define WIFI_SCAN_DWELL_MS      150     // per-channel dwell (~2 s total sweep)
+#define WIFI_SCAN_MIN_PERIOD_MS 6000    // ignore refresh requests fired faster than this
+#define WIFI_SCAN_MAX_RESULTS   30
+
 // ---------- WiFi Station (connect to your network) ----------
 #define WIFI_STA_TIMEOUT_MS  15000       // give up after this and fall back to AP
 #define MDNS_HOST            "camera-slider"   // reachable as camera-slider.local

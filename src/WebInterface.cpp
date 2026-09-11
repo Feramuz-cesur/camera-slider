@@ -298,22 +298,18 @@ static void handleWifiStatus() {
     server.send(200, "application/json", out);
 }
 
+// Never scans inline: a blocking scan holds the loop (and the radio) for
+// seconds, which drops the very client that asked for the list. We answer
+// instantly from the cache and let the scan finish in the background - the page
+// polls until "scanning" goes false.
 static void handleWifiScan() {
-    // Active scan with a longer per-channel dwell (and include hidden APs) so we
-    // catch networks a quick default scan tends to miss.
-    int n = WiFi.scanNetworks(false /*async*/, true /*show_hidden*/,
-                              false /*passive*/, 400 /*ms per channel*/);
-    JsonDocument doc;
-    JsonArray arr = doc.to<JsonArray>();
-    for (int i = 0; i < n && i < 30; i++) {
-        JsonObject o = arr.add<JsonObject>();
-        o["ssid"] = WiFi.SSID(i);
-        o["rssi"] = WiFi.RSSI(i);
-        o["lock"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
-    }
-    WiFi.scanDelete();
-    String out;
-    serializeJson(doc, out);
+    if (server.hasArg("refresh") || Wifi_scanJson() == "[]") Wifi_scanStart();
+
+    String out = "{\"scanning\":";
+    out += Wifi_scanBusy() ? "true" : "false";
+    out += ",\"nets\":";
+    out += Wifi_scanJson();
+    out += "}";
     server.send(200, "application/json", out);
 }
 
@@ -335,15 +331,36 @@ static void handleWifiForget() {
     g_rebootAt = millis() + 800;   // reboot back into AP mode
 }
 
-static void handleNotFound() {
-    // In AP mode, redirect any unknown host/URL to our portal root (absolute URL)
-    // so the OS captive-portal check trips and pops the interface open.
-    if (Wifi_apActive()) {
-        server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString() + "/", true);
-    } else {
-        server.sendHeader("Location", "/", true);
-    }
+// ---------- Captive portal ----------
+// Right after joining a network every OS fetches a known URL over plain HTTP and
+// decides "this is a captive portal" when the answer is not the one it expects.
+// Our DNS server maps every hostname to the AP, so those probes land here.
+//
+// The Location must be a literal IP: the client has no working DNS other than
+// ours at this point. And it must not be cached - a cached redirect makes the OS
+// skip the probe on the next join and just flag the network as broken.
+static void redirectToPortal() {
+    server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString() + "/", true);
     server.send(302, "text/plain", "");
+}
+
+// Registered on the probe URLs themselves so they are answered from RAM instead
+// of going through the static handler's (failing) LittleFS lookups first.
+static void handleProbe() {
+    if (Wifi_apActive()) { redirectToPortal(); return; }
+    server.send(404, "text/plain", "Not found");
+}
+
+static void handleNotFound() {
+    // Only unknown *page* requests get bounced to the portal. API calls from a
+    // stale tab and missing assets (favicon...) must 404 instead, otherwise the
+    // browser chases the redirect back into a request it cannot satisfy.
+    if (Wifi_apActive() && !server.uri().startsWith("/api/") && server.uri() != "/favicon.ico") {
+        redirectToPortal();
+        return;
+    }
+    server.send(404, "text/plain", "Not found");
 }
 
 // ---------- Public ----------
@@ -358,6 +375,20 @@ void Web_begin() {
     server.on("/api/wifi/scan",   HTTP_GET,  handleWifiScan);
     server.on("/api/wifi",        HTTP_POST, handleWifiSave);
     server.on("/api/wifi/forget", HTTP_POST, handleWifiForget);
+
+    // /index.html must go through handleIndex too, or a client that asks for it
+    // by name in AP mode gets the control UI instead of the Wi-Fi setup page.
+    server.on("/index.html", HTTP_GET, handleIndex);
+
+    // OS connectivity probes -> the portal, so the phone opens our setup page
+    // instead of reporting "connected, no internet" and falling back to mobile data.
+    static const char* kProbeUrls[] = {
+        "/generate_204", "/gen_204",                            // Android
+        "/hotspot-detect.html", "/library/test/success.html",    // iOS / macOS
+        "/connecttest.txt", "/ncsi.txt", "/redirect",            // Windows
+        "/canonical.html", "/success.txt",                       // Firefox / others
+    };
+    for (const char* u : kProbeUrls) server.on(u, HTTP_GET, handleProbe);
 
     // Serve any other files placed in /data (e.g. future favicon.ico, css splits)
     server.serveStatic("/", LittleFS, "/");

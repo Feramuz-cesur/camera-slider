@@ -134,8 +134,11 @@ function selectNet(ssid, el){
   $('#pass').focus();
 }
 
-// A single scan often misses APs, so we accumulate results across scans
-// (keyed by SSID, keeping the strongest signal) instead of replacing the list.
+// The device scans in the background and we only poll its cached result. A
+// blocking scan used to park the radio off the AP channel for seconds, which
+// dropped this very connection and made the portal look dead.
+// Results are accumulated across scans (keyed by SSID, strongest signal wins)
+// because a single sweep often misses an AP.
 const found = new Map();
 
 function renderNets(){
@@ -159,28 +162,44 @@ function renderNets(){
   }
 }
 
-let scanning = false;
-async function scan(){
-  if(scanning) return;
-  scanning = true;
-  $('#scan').disabled = true; $('#scan').textContent = 'Scanning…';
-  if(!found.size){ $('#hint').style.display='block'; $('#hint').textContent = 'Scanning…'; }
-
-  const nets = await api('/api/wifi/scan');
-  if(nets){
-    for(const n of nets){
-      if(!n.ssid) continue;
-      const prev = found.get(n.ssid);
-      if(!prev || n.rssi > prev.rssi) found.set(n.ssid, {ssid:n.ssid, rssi:n.rssi, lock:n.lock});
-    }
+function mergeNets(nets){
+  if(!Array.isArray(nets)) return;
+  for(const n of nets){
+    if(!n.ssid) continue;
+    const prev = found.get(n.ssid);
+    if(!prev || n.rssi > prev.rssi) found.set(n.ssid, {ssid:n.ssid, rssi:n.rssi, lock:n.lock});
   }
-  renderNets();
-  if(!found.size) $('#hint').textContent = 'No networks found yet — rescanning…';
-  $('#scan').disabled = false; $('#scan').textContent = 'Rescan';
-  scanning = false;
 }
 
-$('#scan').addEventListener('click', scan);
+function setScanning(on){
+  $('#scan').disabled = on;
+  $('#scan').textContent = on ? 'Scanning…' : 'Rescan';
+  if(!found.size){
+    $('#hint').style.display = 'block';
+    $('#hint').textContent = on ? 'Scanning…' : 'No networks found — tap Rescan.';
+  }
+}
+
+let polling = false;
+async function scan(refresh){
+  if(polling) return;
+  polling = true;
+  setScanning(true);
+  for(let tries = 0; tries < 12; tries++){
+    const r = await api('/api/wifi/scan' + (refresh ? '?refresh=1' : ''));
+    refresh = false;                       // only the first request asks for a new sweep
+    if(r){
+      mergeNets(r.nets);
+      renderNets();
+      if(!r.scanning) break;
+    }
+    await new Promise(res => setTimeout(res, 700));
+  }
+  setScanning(false);
+  polling = false;
+}
+
+$('#scan').addEventListener('click', () => scan(true));
 $('#showPass').addEventListener('change', e => { $('#pass').type = e.target.checked ? 'text' : 'password'; });
 
 $('#connect').addEventListener('click', async () => {
@@ -196,10 +215,9 @@ $('#connect').addEventListener('click', async () => {
   });
 });
 
-// Auto-scan a few times on open so slow-to-respond networks still show up.
-(async function initScan(){
-  for(let i=0;i<3;i++){ await scan(); await new Promise(r=>setTimeout(r,1200)); }
-})();
+// The device starts a scan by itself when its cache is empty, so opening the
+// page just picks the result up.
+scan(false);
 </script>
 </body>
 </html>
