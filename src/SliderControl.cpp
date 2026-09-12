@@ -31,7 +31,12 @@ static Axis ax[AXIS_COUNT] = {
 static SliderState state = STATE_BOOT;
 static bool        homed = false;              // linear axis referenced
 static bool        panHomed = false;           // rotary zero accepted by the user
-static AxisId      manualAxis = AXIS_SLIDER;   // which axis a manual jog / goto drives
+// Which axes currently have a hand-driven move (jog or goto) in flight. This is
+// per axis, not a single "the" axis: the UI can only hold one jog button at a
+// time, but a stop for one axis must never be swallowed because another axis
+// was commanded after it - that used to leave the first motor running all the
+// way to its target.
+static bool        manualActive[AXIS_COUNT] = {false, false};
 static bool        holdEnabled = true;         // keep coils energized while idle (holding torque)
 // Per-axis release, on top of holdEnabled. The rotary homing step frees the pan
 // coils so the platform can be turned to face forward by hand; everything else
@@ -258,7 +263,10 @@ void Slider_stop() {
 }
 
 void Slider_emergencyStop() {
-    for (int i = 0; i < AXIS_COUNT; i++) if (ax[i].stepper) ax[i].stepper->forceStop();
+    for (int i = 0; i < AXIS_COUNT; i++) {
+        if (ax[i].stepper) ax[i].stepper->forceStop();
+        manualActive[i] = false;
+    }
     state = STATE_IDLE;
 }
 
@@ -269,7 +277,8 @@ bool Slider_manualStart(AxisId axis, Direction d, float speed, bool unbounded) {
     if (!ax[axis].stepper) return false;
 
     Slider_applySettings();
-    manualAxis = axis;
+    if (state != STATE_MANUAL) manualActive[AXIS_SLIDER] = manualActive[AXIS_PAN] = false;
+    manualActive[axis] = true;
 
     float maxU = axisMaxSpeedUnits(axis);
     if (speed > maxU) speed = maxU;
@@ -291,7 +300,9 @@ bool Slider_manualStart(AxisId axis, Direction d, float speed, bool unbounded) {
 }
 
 void Slider_manualStop(AxisId axis) {
-    if (state == STATE_MANUAL && manualAxis == axis && ax[axis].stepper) {
+    // Note: the axis stays flagged active until it has actually come to rest, so
+    // a ramped stop is not cut short by the state machine returning to idle.
+    if (state == STATE_MANUAL && manualActive[axis] && ax[axis].stepper) {
         // Ramp down when smooth ramping is on, else stop the instant it's released.
         if (settings.useAccel) {
             ax[axis].stepper->setAcceleration((uint32_t)(axisAccelUnits(axis) * stepsPerUnit(axis)));
@@ -332,7 +343,8 @@ bool Slider_gotoPos(AxisId axis, float pos) {
     if (pos < 0) pos = 0;
     if (pos > Slider_axisMax(axis)) pos = Slider_axisMax(axis);
     Slider_applySettings();
-    manualAxis = axis;
+    if (state != STATE_MANUAL) manualActive[AXIS_SLIDER] = manualActive[AXIS_PAN] = false;
+    manualActive[axis] = true;
     ax[axis].stepper->moveTo(unitToSteps(axis, pos));
     state = STATE_MANUAL;
     return true;
@@ -487,18 +499,25 @@ void Slider_update() {
         }
 
         case STATE_MANUAL: {
-            FastAccelStepper* m = ax[manualAxis].stepper;
-            if (!m->isRunning() && toGo(manualAxis) == 0) {
-                state = STATE_IDLE;
-            }
             // Safety: slider limit hit while moving toward 0 -> abort & re-zero.
-            if (manualAxis == AXIS_SLIDER && limitTriggered(AXIS_SLIDER)
+            if (manualActive[AXIS_SLIDER] && limitTriggered(AXIS_SLIDER)
                 && tgtStep(AXIS_SLIDER) < curStep(AXIS_SLIDER)) {
-                m->forceStop();
-                m->setCurrentPosition(0);
-                m->moveTo(0);
-                state = STATE_IDLE;
+                sl->forceStop();
+                sl->setCurrentPosition(0);
+                sl->moveTo(0);
+                manualActive[AXIS_SLIDER] = false;
             }
+            // Every axis clears its own flag once it has really stopped, and we
+            // only fall back to idle when none is left moving. Watching a single
+            // axis here used to strand the other one mid-jog.
+            bool anyBusy = false;
+            for (int i = 0; i < AXIS_COUNT; i++) {
+                if (!manualActive[i]) continue;
+                AxisId a = (AxisId)i;
+                if (ax[a].stepper->isRunning() || toGo(a) != 0) anyBusy = true;
+                else manualActive[i] = false;
+            }
+            if (!anyBusy) state = STATE_IDLE;
             break;
         }
 
