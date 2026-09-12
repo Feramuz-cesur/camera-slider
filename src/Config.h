@@ -46,14 +46,36 @@
 #define WIFI_TX_POWER   WIFI_POWER_8_5dBm
 
 // ---------- WiFi scan (provisioning page) ----------
-// The scan is run ASYNCHRONOUSLY and cached. A blocking scan parks the radio on
-// every channel in turn, so for dwell x ~14 channels the AP is off its own
-// channel: associated clients stop hearing beacons, new clients cannot complete
-// association, and neither the captive-portal DNS nor the web server answers.
-// That is what made the portal look "connected but dead" right after opening it.
-#define WIFI_SCAN_DWELL_MS      150     // per-channel dwell (~2 s total sweep)
-#define WIFI_SCAN_MIN_PERIOD_MS 6000    // ignore refresh requests fired faster than this
-#define WIFI_SCAN_MAX_RESULTS   30
+// The scan is ASYNCHRONOUS and swept ONE CHANNEL AT A TIME, for two reasons:
+//
+// 1. A scan parks the radio on each channel in turn, so an all-channels sweep
+//    takes the AP off its own channel for seconds on end: associated clients
+//    stop hearing beacons, new clients cannot complete association, and (if the
+//    call also blocks) neither the captive-portal DNS nor the web server answer.
+//    Scanning a single channel per step keeps every absence short.
+// 2. Arduino derives its scan deadline from this very value
+//    (WiFiScan.cpp: _scanTimeout = max_ms_per_chan * 20). For an all-channels
+//    sweep that deadline expires mid-scan while the softAP keeps beaconing, and
+//    scanComplete() reports WIFI_SCAN_FAILED even though the scan was fine - the
+//    result is an always-empty network list. Asking for one channel makes the
+//    derived deadline (dwell x 20) enormously generous for the work requested.
+//
+// What actually matters for clients is not how long the whole sweep takes, but
+// (a) how long the AP is missing in one stretch and (b) what fraction of the
+// time it is missing. A phone tolerates losing a beacon or two; it gives up when
+// the AP vanishes for hundreds of milliseconds at a time. So keep the dwell
+// short and the gap between channels long: 150 ms off / 250 ms on means the AP
+// is present 60% of the sweep and never absent for more than ~150 ms, versus
+// 300/120 (74% absent, in 300 ms blocks) which was enough to break association
+// and DHCP on phones that had just joined.
+#define WIFI_SCAN_DWELL_MS       150    // per-channel dwell -> 3 s deadline for that channel
+#define WIFI_SCAN_CHANNEL_GAP_MS 250    // AP breathing room between channels
+#define WIFI_SCAN_LAST_CHANNEL   13     // 2.4 GHz channels 1..13
+#define WIFI_SCAN_MIN_PERIOD_MS  6000   // ignore refresh requests fired faster than this
+#define WIFI_SCAN_MAX_RESULTS    30
+// The portal page also holds its first automatic sweep back a few seconds (see
+// network.html), so a phone that has just joined can finish DHCP and its
+// captive-portal probe before the radio starts hopping channels.
 
 // ---------- WiFi Station (connect to your network) ----------
 #define WIFI_STA_TIMEOUT_MS  15000       // give up after this and fall back to AP

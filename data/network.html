@@ -185,7 +185,9 @@ async function scan(refresh){
   if(polling) return;
   polling = true;
   setScanning(true);
-  for(let tries = 0; tries < 12; tries++){
+  // A full 1..13 sweep takes ~5 s (150 ms on each channel, 250 ms back on ours
+  // in between) and the list grows channel by channel.
+  for(let tries = 0; tries < 25; tries++){
     const r = await api('/api/wifi/scan' + (refresh ? '?refresh=1' : ''));
     refresh = false;                       // only the first request asks for a new sweep
     if(r){
@@ -193,7 +195,7 @@ async function scan(refresh){
       renderNets();
       if(!r.scanning) break;
     }
-    await new Promise(res => setTimeout(res, 700));
+    await new Promise(res => setTimeout(res, 600));
   }
   setScanning(false);
   polling = false;
@@ -215,9 +217,16 @@ $('#connect').addEventListener('click', async () => {
   });
 });
 
-// The device starts a scan by itself when its cache is empty, so opening the
-// page just picks the result up.
-scan(false);
+// The device starts a sweep by itself when its cache is empty, so opening the
+// page just picks the result up — but hold that first request back a few
+// seconds. A phone that has only just joined is still finishing DHCP and its
+// captive-portal probe, and a radio hopping channels through that window is
+// exactly what makes it decide the network is dead and drop back to mobile
+// data. Rescan stays live during the wait and runs immediately.
+const FIRST_SCAN_DELAY_MS = 4000;
+$('#hint').style.display = 'block';
+$('#hint').textContent = 'Getting ready…';
+setTimeout(() => { if(!polling) scan(false); }, FIRST_SCAN_DELAY_MS);
 </script>
 </body>
 </html>

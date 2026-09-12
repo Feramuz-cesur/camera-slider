@@ -11,10 +11,17 @@ static bool       g_sta = false;
 static bool       g_ap  = false;
 static DNSServer  dnsServer;   // captive portal: resolves every host to the AP IP
 
-// Async scan state (see Config.h for why a blocking scan is not an option).
-static String     g_scanJson = "[]";   // last completed result, ready to serve
-static bool       g_scanBusy = false;
-static uint32_t   g_scanDone = 0;      // millis() when the last scan finished (0 = never)
+// Async scan state (see Config.h for why the sweep is split per channel).
+struct ScanEntry { String ssid; int32_t rssi; bool lock; };
+
+static String     g_scanJson = "[]";   // result so far, ready to serve as-is
+static bool       g_scanBusy = false;  // a sweep is in progress
+static uint32_t   g_scanDone = 0;      // millis() when the last sweep ended (0 = never)
+static ScanEntry  g_scanAcc[WIFI_SCAN_MAX_RESULTS];
+static uint8_t    g_scanAccCount = 0;  // APs collected so far this sweep
+static uint8_t    g_scanChan   = 0;    // channel being scanned right now (0 = between channels)
+static uint8_t    g_scanNextCh = 1;    // next channel to visit
+static uint32_t   g_scanNextAt = 0;    // millis() the next channel may start at
 
 static bool loadCreds(String& ssid, String& pass) {
     File f = LittleFS.open(WIFI_CREDS_FILE, "r");
@@ -31,6 +38,14 @@ static bool loadCreds(String& ssid, String& pass) {
 static void startAP() {
     // AP_STA so the radio can still scan for networks while serving the portal.
     WiFi.mode(WIFI_AP_STA);
+    // ...but the STA side must stay passive. If saved credentials just failed
+    // (wrong password, router out of range) the driver would otherwise keep
+    // retrying that network on its own for as long as the AP is up, and every
+    // attempt takes the radio off the AP channel for seconds - with no client
+    // action involved at all. That looks exactly like "the phone cannot even
+    // associate". Kill the auto-reconnect and cancel any pending attempt.
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect(false /*keep the radio on, we still need it for scans*/);
     // Modem power-save makes the AP slow to associate and laggy to respond
     // (clients, esp. Windows PCs, wait through the radio's sleep windows).
     // Keep the radio always on - this is the single biggest AP responsiveness win.
@@ -79,41 +94,87 @@ void Wifi_begin() {
 }
 
 // ---------- Async network scan ----------
-void Wifi_scanStart() {
-    if (g_scanBusy) return;
-    // Rate-limit: every sweep still takes the radio off the AP channel for ~2 s,
-    // so a page that asks for a refresh in a tight loop must not be able to
-    // keep the AP permanently off-channel.
-    if (g_scanDone && millis() - g_scanDone < WIFI_SCAN_MIN_PERIOD_MS) return;
-    if (WiFi.scanNetworks(true /*async*/, false /*hidden*/, false /*active*/,
-                          WIFI_SCAN_DWELL_MS) == WIFI_SCAN_RUNNING) {
-        g_scanBusy = true;
-    }
-}
-
 bool          Wifi_scanBusy() { return g_scanBusy; }
 const String& Wifi_scanJson() { return g_scanJson; }
 
-// Called from Wifi_loop() while a scan is in flight.
-static void collectScan() {
-    int16_t n = WiFi.scanComplete();
-    if (n == WIFI_SCAN_RUNNING) return;
+// One AP into the sweep's accumulator. The same network often answers on
+// several channels, so keep the strongest sighting of each SSID.
+static void mergeAp(const String& ssid, int32_t rssi, bool lock) {
+    if (ssid.length() == 0) return;   // hidden AP, nothing to pick from a list
+    for (uint8_t i = 0; i < g_scanAccCount; i++) {
+        if (g_scanAcc[i].ssid == ssid) {
+            if (rssi > g_scanAcc[i].rssi) { g_scanAcc[i].rssi = rssi; g_scanAcc[i].lock = lock; }
+            return;
+        }
+    }
+    if (g_scanAccCount >= WIFI_SCAN_MAX_RESULTS) return;
+    g_scanAcc[g_scanAccCount++] = { ssid, rssi, lock };
+}
 
-    g_scanBusy = false;
-    g_scanDone = millis();
-    if (n < 0) return;   // failed - keep whatever list we already had
-
+// Re-serialise the accumulator, strongest first. Called after every channel so
+// the provisioning page fills in as the sweep progresses instead of waiting.
+static void publishScan() {
+    for (int i = 1; i < g_scanAccCount; i++) {          // insertion sort by RSSI
+        ScanEntry e = g_scanAcc[i];
+        int j = i - 1;
+        while (j >= 0 && g_scanAcc[j].rssi < e.rssi) { g_scanAcc[j + 1] = g_scanAcc[j]; j--; }
+        g_scanAcc[j + 1] = e;
+    }
     JsonDocument doc;
     JsonArray arr = doc.to<JsonArray>();
-    for (int i = 0; i < n && i < WIFI_SCAN_MAX_RESULTS; i++) {
+    for (uint8_t i = 0; i < g_scanAccCount; i++) {
         JsonObject o = arr.add<JsonObject>();
-        o["ssid"] = WiFi.SSID(i);
-        o["rssi"] = WiFi.RSSI(i);
-        o["lock"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+        o["ssid"] = g_scanAcc[i].ssid;
+        o["rssi"] = g_scanAcc[i].rssi;
+        o["lock"] = g_scanAcc[i].lock;
     }
     g_scanJson = "";
     serializeJson(doc, g_scanJson);
-    WiFi.scanDelete();
+}
+
+void Wifi_scanStart() {
+    if (g_scanBusy) return;
+    // Every sweep still costs the AP some time off-channel, so a page asking for
+    // refreshes in a tight loop must not be able to keep it there.
+    if (g_scanDone && millis() - g_scanDone < WIFI_SCAN_MIN_PERIOD_MS) return;
+    g_scanAccCount = 0;
+    g_scanChan     = 0;
+    g_scanNextCh   = 1;
+    g_scanNextAt   = millis();
+    g_scanBusy     = true;
+}
+
+// Drives the sweep; called from Wifi_loop() while one is in progress.
+static void scanStep() {
+    uint32_t now = millis();
+
+    if (g_scanChan) {                       // a channel scan is in flight
+        int16_t n = WiFi.scanComplete();
+        if (n == WIFI_SCAN_RUNNING) return;
+        for (int i = 0; i < n; i++)         // n < 0 on failure -> loop does not run
+            mergeAp(WiFi.SSID(i), WiFi.RSSI(i), WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+        WiFi.scanDelete();
+        publishScan();
+        g_scanChan   = 0;
+        g_scanNextAt = now + WIFI_SCAN_CHANNEL_GAP_MS;   // let the AP breathe
+        return;
+    }
+
+    if ((int32_t)(now - g_scanNextAt) < 0) return;
+
+    if (g_scanNextCh > WIFI_SCAN_LAST_CHANNEL) {         // sweep complete
+        g_scanBusy = false;
+        g_scanDone = now;
+        return;
+    }
+
+    if (WiFi.scanNetworks(true /*async*/, false /*hidden*/, false /*active*/,
+                          WIFI_SCAN_DWELL_MS, g_scanNextCh) == WIFI_SCAN_RUNNING) {
+        g_scanChan = g_scanNextCh;
+    } else {
+        g_scanNextAt = now + WIFI_SCAN_CHANNEL_GAP_MS;   // could not start; skip on
+    }
+    g_scanNextCh++;
 }
 
 bool Wifi_saveCreds(const String& ssid, const String& pass) {
@@ -138,6 +199,6 @@ String Wifi_ssid()      { return g_sta ? WiFi.SSID() : String(AP_SSID); }
 
 void Wifi_loop() {
     if (g_ap)       dnsServer.processNextRequest();
-    if (g_scanBusy) collectScan();
+    if (g_scanBusy) scanStep();
     // ESP32 mDNS runs in its own task; no update() call needed.
 }
