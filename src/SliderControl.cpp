@@ -29,9 +29,14 @@ static Axis ax[AXIS_COUNT] = {
 };
 
 static SliderState state = STATE_BOOT;
-static bool        homed = false;
+static bool        homed = false;              // linear axis referenced
+static bool        panHomed = false;           // rotary zero accepted by the user
 static AxisId      manualAxis = AXIS_SLIDER;   // which axis a manual jog / goto drives
 static bool        holdEnabled = true;         // keep coils energized while idle (holding torque)
+// Per-axis release, on top of holdEnabled. The rotary homing step frees the pan
+// coils so the platform can be turned to face forward by hand; everything else
+// stays held. Cleared as soon as anything moves.
+static bool        axisReleased[AXIS_COUNT] = {false, false};
 
 // auto-move bookkeeping. Both axes are driven from one shared clock: every loop
 // each axis is commanded to start + (end-start)*s, where s is the eased fraction
@@ -115,8 +120,11 @@ static void axisPower(AxisId a, bool on) {
 // the coils on demand via Slider_setMotorsEnabled(false).
 static void applyPowerFor(SliderState s) {
     bool moving = !(s == STATE_IDLE || s == STATE_BOOT || s == STATE_FAULT);
-    if (moving) holdEnabled = true;
-    for (int i = 0; i < AXIS_COUNT; i++) axisPower((AxisId)i, holdEnabled);
+    if (moving) {
+        holdEnabled = true;
+        for (int i = 0; i < AXIS_COUNT; i++) axisReleased[i] = false;
+    }
+    for (int i = 0; i < AXIS_COUNT; i++) axisPower((AxisId)i, holdEnabled && !axisReleased[i]);
 }
 
 // ---------- Setup ----------
@@ -150,12 +158,27 @@ bool Slider_setMotorsEnabled(bool enabled) {
         holdEnabled = false;
     } else {
         holdEnabled = true;
+        for (int i = 0; i < AXIS_COUNT; i++) axisReleased[i] = false;
     }
-    for (int i = 0; i < AXIS_COUNT; i++) axisPower((AxisId)i, holdEnabled);
+    for (int i = 0; i < AXIS_COUNT; i++) axisPower((AxisId)i, holdEnabled && !axisReleased[i]);
     return true;
 }
 
 bool Slider_motorsEnabled() { return holdEnabled; }
+
+bool Slider_setAxisPower(AxisId axis, bool on) {
+    if (axis >= AXIS_COUNT || !ax[axis].stepper) return false;
+    // Dropping a single axis mid-move would lose steps; only allow it at rest.
+    if (!on && state != STATE_IDLE && state != STATE_BOOT && state != STATE_FAULT) return false;
+    axisReleased[axis] = !on;
+    if (on) holdEnabled = true;
+    for (int i = 0; i < AXIS_COUNT; i++) axisPower((AxisId)i, holdEnabled && !axisReleased[i]);
+    return true;
+}
+
+bool Slider_axisPowered(AxisId axis) {
+    return (axis < AXIS_COUNT) && ax[axis].energized;
+}
 
 void Slider_applySettings() {
     for (int i = 0; i < AXIS_COUNT; i++) {
@@ -193,6 +216,17 @@ bool Slider_startHoming() {
     return true;
 }
 
+// The user reports the carriage is running away from the switch: abort the run
+// and start over. The caller flips settings.invertDir (and persists it) first,
+// so Slider_applySettings() here picks up the new direction.
+bool Slider_restartHoming() {
+    for (int i = 0; i < AXIS_COUNT; i++) if (ax[i].stepper) ax[i].stepper->forceStop();
+    state = STATE_IDLE;
+    homed = false;
+    Slider_applySettings();     // re-applies the (now flipped) direction pin polarity
+    return Slider_startHoming();
+}
+
 void Slider_skipHoming() {
     // Skip homing: assume both axes are at 0 and unlock movement.
     for (int i = 0; i < AXIS_COUNT; i++) {
@@ -228,7 +262,7 @@ void Slider_emergencyStop() {
     state = STATE_IDLE;
 }
 
-bool Slider_manualStart(AxisId axis, Direction d, float speed) {
+bool Slider_manualStart(AxisId axis, Direction d, float speed, bool unbounded) {
     if (!homed) return false;
     if (state != STATE_IDLE && state != STATE_MANUAL) return false;
     if (speed <= 0) return false;
@@ -245,7 +279,12 @@ bool Slider_manualStart(AxisId axis, Direction d, float speed) {
                   settings.useAccel ? axisAccelUnits(axis) * stepsPerUnit(axis)
                                     : instantAccelSteps(axis));
 
-    long target = (d == DIR_RIGHT) ? unitToSteps(axis, Slider_axisMax(axis)) : 0;
+    // Measuring the rail means driving past whatever maxTravelMm currently says,
+    // so the wizard may raise the ceiling to the hard limit. Only the linear axis
+    // has a length to discover, and only the "away from zero" direction needs it.
+    float ceiling = (unbounded && axis == AXIS_SLIDER) ? MAX_TRAVEL_LIMIT_MM
+                                                       : Slider_axisMax(axis);
+    long target = (d == DIR_RIGHT) ? unitToSteps(axis, ceiling) : 0;
     ax[axis].stepper->moveTo(target);
     state = STATE_MANUAL;
     return true;
@@ -263,18 +302,28 @@ void Slider_manualStop(AxisId axis) {
     }
 }
 
-// Treat the axis's current physical position as its new zero (origin), without
-// moving. Accepting the slider's zero also unlocks movement (counts as homed).
-bool Slider_setZero(AxisId axis) {
+// Treat the axis's current physical position as posUnits, without moving it.
+// Accepting the slider's reference also unlocks movement (counts as homed).
+bool Slider_setReference(AxisId axis, float posUnits) {
     if (state != STATE_IDLE && state != STATE_BOOT && state != STATE_FAULT) return false;
     if (!ax[axis].stepper) return false;
+    float p = constrain(posUnits, 0.0f, Slider_axisMax(axis));
+    long  ref = unitToSteps(axis, p);
     ax[axis].stepper->forceStop();
-    ax[axis].stepper->setCurrentPosition(0);
-    ax[axis].stepper->moveTo(0);
+    ax[axis].stepper->setCurrentPosition(ref);
+    ax[axis].stepper->moveTo(ref);
     if (axis == AXIS_SLIDER) homed = true;
+    else                     panHomed = true;
+    // Accepting a zero means we now have to hold it: take back any release that
+    // let the user position this axis by hand.
+    axisReleased[axis] = false;
+    holdEnabled = true;
+    for (int i = 0; i < AXIS_COUNT; i++) axisPower((AxisId)i, holdEnabled && !axisReleased[i]);
     state = STATE_IDLE;
     return true;
 }
+
+bool Slider_setZero(AxisId axis) { return Slider_setReference(axis, 0.0f); }
 
 bool Slider_gotoPos(AxisId axis, float pos) {
     if (!homed) return false;
@@ -553,6 +602,7 @@ SliderState Slider_state()       { return state; }
 float       Slider_position(AxisId a) { return ax[a].stepper ? stepsToUnit(a, ax[a].stepper->getCurrentPosition()) : 0.0f; }
 float       Slider_positionMm()  { return Slider_position(AXIS_SLIDER); }
 bool        Slider_isHomed()     { return homed; }
+bool        Slider_isPanHomed()  { return panHomed; }
 
 float Slider_autoProgress() {
     if (state == STATE_AUTO_REPOSITION) return 0.0f;

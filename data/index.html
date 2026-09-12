@@ -23,20 +23,19 @@
   .badge.ok{background:#0e3826;color:var(--ok)}
   .badge.warn{background:#3a2c10;color:var(--warn)}
   .badge.bad{background:#3a1418;color:var(--bad)}
-  .status{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+  .badges{display:flex;gap:6px;align-items:center}
+  /* live machine state, incl. progress while an auto move runs */
+  #statText{font-variant-numeric:tabular-nums}
+  #statText.busy{background:#13314f;color:#9fd0ff}
   .row{display:flex;justify-content:space-between;align-items:center;margin:4px 0}
   .row .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
   .row .val{font-variant-numeric:tabular-nums;font-weight:600}
-  .statline{display:flex;gap:16px}
-  .statline .val{font-weight:600}
-  .progress{height:6px;background:#222836;border-radius:6px;overflow:hidden;margin-top:8px}
-  .progress > div{height:100%;background:linear-gradient(90deg,var(--accent),#7ec4ff);width:0%;transition:width .15s linear}
   nav{display:flex;border-bottom:1px solid var(--line);background:#10131a}
   nav button{flex:1;background:none;border:0;color:var(--muted);padding:14px 0;font:inherit;
     border-bottom:2px solid transparent;cursor:pointer}
   nav button.active{color:var(--text);border-bottom-color:var(--accent)}
   main{padding:16px;max-width:520px;margin:0 auto;
-    padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+    padding-bottom:calc(140px + env(safe-area-inset-bottom))}
   section{display:none}
   section.active{display:block}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
@@ -69,30 +68,42 @@
   .hint{font-size:12px;color:var(--muted);margin-top:6px}
   .small{font-size:12px;color:var(--muted)}
 
-  /* ---- Dual-thumb linear range ---- */
-  .range2{position:relative;height:46px;margin:18px 4px 6px}
-  .range2 .track{position:absolute;top:20px;left:0;right:0;height:6px;border-radius:6px;background:#0f1218;border:1px solid var(--line)}
-  .range2 .fill{position:absolute;top:20px;height:6px;border-radius:6px;background:linear-gradient(90deg,var(--accent),#7ec4ff)}
-  .range2 .cur{position:absolute;top:13px;width:2px;height:20px;background:var(--ok);border-radius:2px;transform:translateX(-1px);transition:left .15s linear}
-  .range2 .thumb{position:absolute;top:11px;width:24px;height:24px;margin-left:-12px;border-radius:50%;
-    background:#e7ecf3;border:3px solid var(--accent);cursor:grab;touch-action:none;box-shadow:0 2px 6px rgba(0,0,0,.5)}
-  .range2 .thumb:active{cursor:grabbing}
-  .range2 .thumb.end{border-color:#7ec4ff}
-  .range2 .thumb .tip{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);font-size:10px;
-    color:var(--muted);white-space:nowrap}
+  /* ---- Jog row: hold-to-move buttons flanking a live position view ---- */
+  .jogrow{display:flex;align-items:center;gap:12px;margin:2px 0 4px}
+  .jogbtn{flex:none;width:62px;height:74px;border-radius:16px;border:1px solid var(--line);
+    background:#1d2230;color:var(--text);font:inherit;font-size:20px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    touch-action:none;-webkit-user-select:none;user-select:none;
+    transition:background .08s,transform .08s}
+  .jogbtn:active{background:var(--accent2);transform:scale(.96)}
+  .jogrow.rot .jogbtn:active{background:var(--pan2)}
+  .jogview{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px}
+  .jogval{font-variant-numeric:tabular-nums;font-weight:700;font-size:20px;letter-spacing:.5px}
+  .jogval.lin{color:var(--accent)}
+  .jogval.rot{color:var(--pan)}
+  .jogmeta{font-size:11px;color:var(--muted);letter-spacing:.3px}
+  .jogmeta b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 
-  .rangefields{display:flex;gap:10px;margin-top:6px}
-  .rangefields .rf{flex:1;display:flex;flex-direction:column;gap:4px}
-  .rangefields .rf span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-  .rangefields .rf input{background:#0f1218;border:1px solid var(--line);color:var(--text);
-    padding:9px 10px;border-radius:8px;font:inherit;text-align:center;width:100%}
-  .miniact{display:flex;gap:8px;margin-top:8px}
-  .miniact button{flex:1;background:#1d2230;border:1px solid var(--line);color:var(--text);
-    padding:11px 0;border-radius:8px;font:inherit;font-size:12px;cursor:pointer;
-    touch-action:manipulation;-webkit-user-select:none;user-select:none}
-  .miniact button:active{background:var(--accent2)}
-  .miniact button.jogbtn{font-weight:600}
-  .miniact.rot button.jogbtn:active{background:var(--pan2)}
+  /* Linear position readout: a bar with the live carriage dot (read-only) */
+  .linbar{position:relative;width:100%;height:22px}
+  .linbar .rail{position:absolute;top:9px;left:0;right:0;height:4px;border-radius:4px;
+    background:#0f1218;border:1px solid var(--line)}
+  .linbar .span{position:absolute;top:9px;height:4px;border-radius:4px;background:#21405e}
+  .linbar .mark{position:absolute;top:4px;width:2px;height:14px;border-radius:2px;
+    background:var(--muted);opacity:.75;transform:translateX(-1px)}
+  .linbar .dot{position:absolute;top:4px;width:14px;height:14px;margin-left:-7px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 0 4px rgba(78,161,255,.16);transition:left .12s linear}
+
+  /* Rotary position readout: a ring with the live dot travelling on it */
+  .rotdial{width:130px;height:130px;display:block}
+  .rotdial .ring{fill:none;stroke:#0f1218;stroke-width:6}
+  .rotdial .span{fill:none;stroke:#3b2b60;stroke-width:6;stroke-linecap:round}
+  .rotdial .tick{stroke:var(--muted);stroke-width:2;opacity:.75;stroke-linecap:round}
+  .rotdial .dot{fill:var(--pan)}
+  .rotdial .dotglow{fill:var(--pan);opacity:.16}
+  .rotdial .hub{fill:none;stroke:var(--line);stroke-width:1.5}
+  .rotdial text{fill:var(--muted);font-size:10px;letter-spacing:.5px}
+  .rotdial .big{fill:var(--text);font-size:17px;font-weight:600;letter-spacing:0}
 
   /* ---- Toggle switch (settings) ---- */
   .switch{position:relative;display:inline-block;width:46px;height:26px;flex:none}
@@ -104,120 +115,151 @@
   .switch input:checked + .track{background:var(--accent2);border-color:var(--accent)}
   .switch input:checked + .track::before{transform:translateX(20px);background:#fff}
 
-  /* ---- Rotary dial ---- */
-  .dialwrap{display:flex;justify-content:center;margin:6px 0 4px}
-  .dial{touch-action:none}
-  .dial .ring{fill:none;stroke:#0f1218;stroke-width:8}
-  .dial .arc{fill:none;stroke:var(--pan);stroke-width:8;stroke-linecap:round}
-  .dial .tick{stroke:var(--line);stroke-width:1}
-  .dial .zeroneedle{stroke:var(--accent);stroke-width:2;stroke-linecap:round;opacity:.85}
-  .dial .needle{stroke:var(--ok);stroke-width:2;stroke-linecap:round}
-  .dial .center{fill:var(--muted)}
-  .dial .handle{fill:#e7ecf3;stroke:var(--pan);stroke-width:3;cursor:grab}
-  .dial .handle.end{stroke:#caa6ff}
-  .dial text{fill:var(--muted);font-size:10px}
-  .dial .big{fill:var(--text);font-size:15px;font-weight:600}
-  .dial .htext{fill:var(--muted);font-size:10px;font-weight:600;dominant-baseline:central}
-
   /* ---- Small coordinate-origin icon (re-home / use-as buttons) ---- */
   .axicon{width:16px;height:16px;vertical-align:-3px;margin-right:6px}
 
   /* ---- Fixed bottom bar: capture current pose as start/end ---- */
   .setbar{position:fixed;bottom:0;left:0;right:0;z-index:40;
-    display:flex;gap:10px;justify-content:center;
-    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
-    background:rgba(14,16,20,.55);backdrop-filter:blur(10px);
+    display:flex;flex-direction:column;gap:8px;
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(14,16,20,.62);backdrop-filter:blur(10px);
     -webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line)}
-  .setbar button{flex:1;max-width:244px;padding:13px 0;border-radius:10px;
+  .setrow{display:flex;gap:10px;justify-content:center}
+  .setbar button{flex:1;max-width:244px;padding:12px 0;border-radius:10px;
     border:1px solid var(--line);background:#1d2230;color:var(--text);
     font:inherit;font-weight:600;cursor:pointer;touch-action:manipulation}
   .setbar button:active{background:var(--accent2)}
+  /* the "drive there" row reads quieter than the "store this pose" row */
+  .setrow.go button{background:#141821;font-weight:500;color:var(--muted)}
+  .setrow.go button:active{background:var(--accent2);color:var(--text)}
   .setbar.hidden{display:none}
   body:has(.setbar.hidden) main{padding-bottom:16px}
 
-  .lock-overlay{position:fixed;inset:0;background:rgba(8,10,14,.85);backdrop-filter:blur(4px);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:50}
+  /* ---- Two-step homing overlay (linear switch, then rotary by hand) ---- */
+  .lock-overlay{position:fixed;inset:0;background:rgba(8,10,14,.93);backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;
+    padding:18px;z-index:50;overflow:auto}
   .lock-overlay.hidden{display:none}
-  .lock-overlay h2{margin:0 0 8px;font-size:18px}
-  .lock-overlay p{margin:0 0 18px;color:var(--muted);text-align:center;max-width:300px}
+  .homecard{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);
+    border-radius:18px;padding:20px 20px 18px;text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .homecard h2{margin:0 0 6px;font-size:19px;letter-spacing:.2px}
+  .homecard p.lead{margin:0 0 4px;color:var(--muted);font-size:13px;line-height:1.55}
+  .homecard .btn{max-width:100%}
+  .stage{display:none}
+  .stage.on{display:block}
+
+  /* step indicator */
+  .steps{display:flex;align-items:center;justify-content:center;gap:9px;margin:0 0 18px}
+  .steps .st{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
+    letter-spacing:.3px}
+  .steps .num{width:23px;height:23px;border-radius:50%;border:1px solid var(--line);
+    background:#0f1218;display:grid;place-items:center;font-size:11px;font-weight:700}
+  .steps .st.on{color:var(--text)}
+  .steps .st.on .num{background:var(--accent);border-color:var(--accent);color:#fff}
+  .steps .st.done .num{background:#0e3826;border-color:var(--ok);color:var(--ok)}
+  .steps .bar{width:22px;height:2px;background:var(--line);border-radius:2px}
+
+  /* artwork */
+  .homeart{display:grid;place-items:center;margin:2px 0 14px}
+  .homeart svg{max-width:100%;height:auto;overflow:visible}
+  .art .rail{fill:#0f1218;stroke:var(--line);stroke-width:1.5}
+  .art .body{fill:#1d2230;stroke:var(--accent);stroke-width:2}
+  .art .lens{fill:var(--accent);opacity:.55}
+  .art .sw{fill:#1d2230;stroke:var(--muted);stroke-width:2}
+  .art .guide{stroke:var(--line);stroke-width:1.5;stroke-dasharray:4 5}
+  .art .arrow{fill:var(--accent)}
+  .art .arrowline{stroke:var(--accent);stroke-width:3;stroke-linecap:round}
+  .art .lbl{fill:var(--muted);font-size:11px;letter-spacing:1.4px;font-weight:600}
+  .art .lblAcc{fill:var(--accent);font-size:11px;letter-spacing:1.4px;font-weight:700}
+  .art .plate{fill:#141821;stroke:var(--pan);stroke-width:2;stroke-dasharray:5 6;opacity:.9}
+  .art .phone{fill:#1d2230;stroke:var(--pan);stroke-width:2}
+  .art .clamp{fill:#0f1218;stroke:var(--pan);stroke-width:1.5;opacity:.8}
+  .art .hub{fill:#0f1218;stroke:var(--line);stroke-width:1.5}
+  .art .spin{fill:none;stroke:var(--pan);stroke-width:2.5;stroke-linecap:round}
+  .art .spinhead{fill:var(--pan)}
+
+  /* the carriage creeps toward the switch only while homing is running */
+  .carriage{transform:translateX(56px)}
+  .lock-overlay.running .carriage{animation:creep 2.6s ease-in-out infinite}
+  @keyframes creep{0%{transform:translateX(56px)}70%{transform:translateX(0)}
+    85%{transform:translateX(0)}100%{transform:translateX(56px)}}
+  .phonegrp{transform-origin:110px 112px;animation:nudge 3.4s ease-in-out infinite}
+  @keyframes nudge{0%,100%{transform:rotate(-16deg)}50%{transform:rotate(16deg)}}
+  @media (prefers-reduced-motion: reduce){
+    .lock-overlay.running .carriage,.phonegrp{animation:none}
+  }
+
+  .art .dim{fill:var(--text);font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+  .art .swon{stroke:var(--ok)}
+  /* the wizard's jog row is a touch tighter than the one on the control screen */
+  #stageTravel .jogrow{margin:12px 0 14px}
+  #stageTravel .jogbtn{height:64px}
+  #stageTravel .seg{margin:0}
+  .homemsg{font-size:12px;color:var(--muted);margin:12px 0 0;min-height:16px}
+  .homemsg.live{color:var(--accent)}
+  .homehint{font-size:11.5px;color:var(--muted);line-height:1.5;margin:14px 0 0;
+    padding-top:12px;border-top:1px solid var(--line)}
+  .btn.ghost{background:none;border:0;color:var(--muted);font-weight:500;padding:10px;
+    text-decoration:underline;text-underline-offset:3px}
 </style>
 </head>
 <body>
 
 <header>
   <h1>Camera Slider</h1>
-  <span id="connBadge" class="badge">connecting</span>
+  <span class="badges">
+    <span id="statText" class="badge">&mdash;</span>
+    <span id="connBadge" class="badge">connecting</span>
+  </span>
 </header>
 
-<div class="status">
-  <div class="row"><span class="label">Status</span><span id="statText" class="val">—</span></div>
-  <div class="row">
-    <span class="statline">
-      <span class="val" style="color:var(--accent)">↔ <span id="posVal">0.0</span> mm</span>
-      <span class="val" style="color:var(--pan)">⟳ <span id="panVal">0.0</span>°</span>
-    </span>
-  </div>
-  <div class="progress"><div id="progBar"></div></div>
-</div>
-
 <nav>
-  <button data-tab="auto" class="active">Auto</button>
+  <button data-tab="control" class="active">Control</button>
   <button data-tab="settings">Settings</button>
 </nav>
 
 <main>
 
-  <section id="tab-auto" class="active">
+  <section id="tab-control" class="active">
     <div class="card">
-      <h2>Slider Path <span class="axistag lin">LINEAR</span></h2>
-      <div class="range2" id="linRange">
-        <div class="track"></div>
-        <div class="fill" id="linFill"></div>
-        <div class="cur" id="linCur"></div>
-        <div class="thumb start" id="linStart" data-key="sStart"><span class="tip">start</span></div>
-        <div class="thumb end" id="linEnd" data-key="sEnd"><span class="tip">end</span></div>
-      </div>
-      <div class="rangefields">
-        <label class="rf"><span>Start (mm)</span><input type="number" id="sStart" min="0" step="1"></label>
-        <label class="rf"><span>End (mm)</span><input type="number" id="sEnd" min="0" step="1"></label>
-      </div>
-      <div class="miniact">
-        <button data-axis="slider" data-edge="start">Go to start</button>
-        <button data-axis="slider" data-edge="end">Go to end</button>
-      </div>
-      <div class="miniact">
-        <button class="jogbtn" data-jog="slider" data-dir="left">&#9664; Left</button>
-        <button class="jogbtn" data-jog="slider" data-dir="right">Right &#9654;</button>
+      <h2>Slider Jog <span class="axistag lin">LINEAR</span></h2>
+      <div class="jogrow lin">
+        <button class="jogbtn" data-jog="slider" data-dir="left" aria-label="Jog left">&#9664;</button>
+        <div class="jogview">
+          <div class="jogval lin"><span id="linVal">0.0</span> mm</div>
+          <div class="linbar" id="linBar">
+            <div class="rail"></div>
+            <div class="span" id="linSpan"></div>
+            <div class="mark" id="linMarkS"></div>
+            <div class="mark" id="linMarkE"></div>
+            <div class="dot" id="linDot"></div>
+          </div>
+          <div class="jogmeta">start <b id="linStartTxt">0</b> mm &middot; end <b id="linEndTxt">0</b> mm</div>
+        </div>
+        <button class="jogbtn" data-jog="slider" data-dir="right" aria-label="Jog right">&#9654;</button>
       </div>
     </div>
 
     <div class="card">
-      <h2>Pan Path <span class="axistag rot">ROTARY</span></h2>
-      <div class="dialwrap">
-        <svg id="dial" class="dial" width="220" height="220" viewBox="0 0 220 220">
-          <circle class="ring" cx="110" cy="110" r="82"></circle>
-          <path class="arc" id="panArc"></path>
-          <line class="zeroneedle" id="panZero" x1="110" y1="110" x2="110" y2="192"></line>
-          <line class="needle" id="panNeedle" x1="110" y1="110" x2="110" y2="192"></line>
-          <circle class="center" cx="110" cy="110" r="3"></circle>
-          <text id="panAngleTxt" class="big" x="110" y="72" text-anchor="middle">0°</text>
-          <circle class="handle start" id="panStartH" r="11" data-key="pStart"></circle>
-          <circle class="handle end" id="panEndH" r="11" data-key="pEnd"></circle>
-          <text class="htext" id="panStartTxt" text-anchor="middle">start</text>
-          <text class="htext" id="panEndTxt" text-anchor="middle">end</text>
-        </svg>
-      </div>
-      <div class="rangefields">
-        <label class="rf"><span>Start (°)</span><input type="number" id="pStart" min="0" max="360" step="1"></label>
-        <label class="rf"><span>End (°)</span><input type="number" id="pEnd" min="0" max="360" step="1"></label>
-      </div>
-      <div class="miniact">
-        <button data-axis="pan" data-edge="start">Go to start</button>
-        <button data-axis="pan" data-edge="end">Go to end</button>
-      </div>
-      <div class="miniact rot">
-        <button class="jogbtn" data-jog="pan" data-dir="left">&#8634; CCW</button>
-        <button class="jogbtn" data-jog="pan" data-dir="right">CW &#8635;</button>
+      <h2>Pan Jog <span class="axistag rot">ROTARY</span></h2>
+      <div class="jogrow rot">
+        <button class="jogbtn" data-jog="pan" data-dir="left" aria-label="Jog counter-clockwise">&#8634;</button>
+        <div class="jogview">
+          <svg class="rotdial" viewBox="0 0 130 130" aria-hidden="true">
+            <circle class="ring" cx="65" cy="65" r="48"></circle>
+            <path class="span" id="rotSpan"></path>
+            <line class="tick" id="rotTickS" x1="65" y1="9" x2="65" y2="19"></line>
+            <line class="tick" id="rotTickE" x1="65" y1="9" x2="65" y2="19"></line>
+            <circle class="hub" cx="65" cy="65" r="27"></circle>
+            <circle class="dotglow" id="rotGlow" cx="65" cy="17" r="11"></circle>
+            <circle class="dot" id="rotDot" cx="65" cy="17" r="6"></circle>
+            <text class="big" id="rotVal" x="65" y="69" text-anchor="middle">0&deg;</text>
+            <text id="rotFwdTxt" x="65" y="86" text-anchor="middle">FWD 180&deg;</text>
+          </svg>
+          <div class="jogmeta">start <b id="rotStartTxt">0</b>&deg; &middot; end <b id="rotEndTxt">0</b>&deg;</div>
+        </div>
+        <button class="jogbtn" data-jog="pan" data-dir="right" aria-label="Jog clockwise">&#8635;</button>
       </div>
     </div>
 
@@ -234,19 +276,9 @@
           </select>
         </span>
       </div>
-      <p class="small">Enabled axes go from start to end together, finishing at the same time.</p>
-    </div>
-    <div class="card">
-      <h2>Axes in move</h2>
-      <div class="field">
-        <label for="enLinear">Linear (slider)</label>
-        <label class="switch"><input type="checkbox" id="enLinear" checked><span class="track"></span></label>
-      </div>
-      <div class="field">
-        <label for="enRotary">Rotary (pan)</label>
-        <label class="switch"><input type="checkbox" id="enRotary" checked><span class="track"></span></label>
-      </div>
-      <p class="small">Turn an axis off to leave it out of the move. Both off disables Start.</p>
+      <p class="small">Jog each axis where you want it, then capture the pose with
+        <b>Use as Start</b> / <b>Use as End</b> below. Both axes travel from start to
+        end together and finish at the same time.</p>
     </div>
     <button class="btn" id="autoStart">Start Move</button>
     <button class="btn secondary" id="autoPause" style="display:none">Pause</button>
@@ -256,15 +288,8 @@
     <div class="card" style="margin-top:12px">
       <h2>Quick Actions</h2>
       <button class="btn motorsbtn" id="motorsBtn">Disable Steppers</button>
-      <button class="btn secondary" id="rehome">
-        <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
-        Re-Home Linear
-      </button>
-      <button class="btn secondary" id="rehomeRot">
-        <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
-        Re-Home Rotary
-      </button>
-      <p class="hint">Steppers stay energized (holding torque) by default. Disable to release them so the rig can be moved by hand; any move re-enables them. Re-Home Linear runs the limit-switch homing to find the linear 0; Re-Home Rotary sets the current pan angle as 0&deg;.</p>
+      <p class="hint">Steppers stay energized (holding torque) by default. Disable to release
+        them so the rig can be moved by hand; any move re-enables them.</p>
     </div>
   </section>
 
@@ -347,6 +372,11 @@
 </main>
 
 <div class="setbar">
+  <div class="setrow go">
+    <button id="goStart"><svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 12H8M13 7l-5 5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>Go to Start</button>
+    <button id="goEnd"><svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4v16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 12h12M11 7l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>Go to End</button>
+  </div>
+  <div class="setrow">
   <button id="useStart">
     <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
     Use as Start
@@ -355,15 +385,136 @@
     <svg class="axicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
     Use as End
   </button>
+  </div>
 </div>
 
 <div id="lockOverlay" class="lock-overlay">
-  <h2>Homing</h2>
-  <p>Home the slider for an accurate reference, or skip and use the current position as 0.</p>
-  <button class="btn" id="homeBtn" style="max-width:240px">Start Homing</button>
-  <button class="btn secondary" id="skipHomeBtn" style="max-width:240px">Skip (use current position)</button>
-  <button class="btn danger" id="stopHomeBtn" style="max-width:240px;display:none">&#9209; Stop Homing</button>
-  <p id="homingMsg" class="small" style="margin-top:14px"></p>
+  <div class="homecard">
+
+    <div class="steps">
+      <span class="st" id="step1"><span class="num">1</span>Home</span>
+      <span class="bar"></span>
+      <span class="st" id="step2"><span class="num">2</span>Travel</span>
+      <span class="bar"></span>
+      <span class="st" id="step3"><span class="num">3</span>Pan</span>
+    </div>
+
+    <!-- ===== Step 1: linear axis homes itself against the limit switch ===== -->
+    <div class="stage on" id="stageLin">
+      <div class="homeart">
+        <svg class="art" viewBox="0 0 240 136" width="240" height="136">
+          <!-- limit switch sitting at the zero end of the rail -->
+          <text class="lbl" x="29" y="30" text-anchor="middle">0</text>
+          <line class="guide" x1="29" y1="36" x2="29" y2="54"></line>
+          <rect class="sw" x="22" y="56" width="14" height="32" rx="3"></rect>
+          <!-- rail -->
+          <rect class="rail" x="40" y="70" width="180" height="10" rx="5"></rect>
+          <!-- carriage: creeps toward the switch while homing runs -->
+          <g class="carriage">
+            <rect class="body" x="52" y="42" width="64" height="36" rx="8"></rect>
+            <circle class="lens" cx="84" cy="60" r="10"></circle>
+          </g>
+          <!-- travel direction -->
+          <polygon class="arrow" points="58,106 73,98 73,114"></polygon>
+          <line class="arrowline" x1="73" y1="106" x2="182" y2="106"></line>
+          <text class="lbl" x="120" y="130" text-anchor="middle">TOWARD ZERO</text>
+        </svg>
+      </div>
+      <h2>Step 1 &mdash; Home the slider</h2>
+      <p class="lead">The carriage drives to the limit switch to find its 0 mm
+        reference. Keep the rail clear.</p>
+      <button class="btn" id="homeBtn">Start Homing</button>
+      <button class="btn secondary" id="wrongDirBtn" style="display:none">&#8634; Wrong way &mdash; reverse motor</button>
+      <button class="btn danger" id="stopHomeBtn" style="display:none">&#9209; Stop Homing</button>
+      <button class="btn ghost" id="skipHomeBtn">Skip &mdash; use current position as 0</button>
+      <p class="homemsg" id="homingMsg"></p>
+    </div>
+
+    <!-- ===== Step 2: measure the rail by driving to the far end ===== -->
+    <div class="stage" id="stageTravel">
+      <div class="homeart">
+        <svg class="art" viewBox="0 0 240 142" width="240" height="142">
+          <!-- switch marks the zero we just found -->
+          <rect class="sw swon" x="22" y="40" width="14" height="32" rx="3"></rect>
+          <text class="lbl" x="29" y="30" text-anchor="middle">0</text>
+          <!-- rail -->
+          <rect class="rail" x="40" y="54" width="182" height="10" rx="5"></rect>
+          <!-- carriage parked at the far end -->
+          <g>
+            <rect class="body" x="158" y="26" width="60" height="34" rx="8"></rect>
+            <circle class="lens" cx="188" cy="43" r="9"></circle>
+          </g>
+          <!-- dimension line: switch <-> carriage -->
+          <line class="guide" x1="29" y1="74" x2="29" y2="116"></line>
+          <line class="guide" x1="188" y1="62" x2="188" y2="116"></line>
+          <polygon class="arrow" points="29,110 44,103 44,117"></polygon>
+          <polygon class="arrow" points="188,110 173,103 173,117"></polygon>
+          <line class="arrowline" x1="42" y1="110" x2="175" y2="110"></line>
+          <text class="dim" id="calArtVal" x="108" y="104" text-anchor="middle">0.0 mm</text>
+        </svg>
+      </div>
+      <h2>Step 2 &mdash; Measure the rail</h2>
+      <p class="lead">Jog the carriage to the <b>far end</b> of the rail, stop just
+        short of the hard stop, then store the distance as the travel limit.</p>
+
+      <div class="seg" id="calSpeed">
+        <button data-speed="slow">Slow</button>
+        <button data-speed="fast" class="on">Fast</button>
+      </div>
+
+      <div class="jogrow lin">
+        <button class="jogbtn" data-jog="slider" data-dir="left" data-free="1"
+          aria-label="Jog left">&#9664;</button>
+        <div class="jogview">
+          <div class="jogval lin"><span id="calPos">0.0</span> mm</div>
+          <div class="jogmeta">stored limit <b id="calStored">300</b> mm &middot;
+            jog <b id="calSpeedVal">30</b> mm/s</div>
+        </div>
+        <button class="jogbtn" data-jog="slider" data-dir="right" data-free="1"
+          aria-label="Jog right">&#9654;</button>
+      </div>
+
+      <button class="btn" id="calSetBtn">Set Max Travel &mdash; <span id="calBtnVal">0.0</span> mm</button>
+      <button class="btn ghost" id="calKeepBtn">Keep current &mdash; <span id="calKeepVal">300</span> mm</button>
+      <p class="homemsg" id="calMsg"></p>
+    </div>
+
+    <!-- ===== Step 2: rotary axis has no switch — the user aims it by hand ===== -->
+    <div class="stage" id="stageRot">
+      <div class="homeart">
+        <svg class="art" viewBox="0 0 220 190" width="220" height="190">
+          <!-- the direction the user is asked to aim at -->
+          <text class="lblAcc" x="110" y="12" text-anchor="middle">FORWARD</text>
+          <polygon class="arrow" points="110,18 119,37 101,37"></polygon>
+          <line class="arrowline" x1="110" y1="36" x2="110" y2="52"></line>
+          <!-- rotating platform, seen from above -->
+          <circle class="plate" cx="110" cy="112" r="56"></circle>
+          <!-- turn hints, sweeping up toward FORWARD -->
+          <path class="spin" d="M 158.2 165.5 A 72 72 0 0 0 181.3 102.0"></path>
+          <polygon class="spinhead" points="179.8,91.1 188.2,104.0 175.3,105.9"></polygon>
+          <path class="spin" d="M 61.8 165.5 A 72 72 0 0 1 38.7 102.0"></path>
+          <polygon class="spinhead" points="40.2,91.1 44.7,105.9 31.8,104.0"></polygon>
+          <!-- phone holder on its shaft; the marked face is the forward one -->
+          <circle class="hub" cx="110" cy="112" r="11"></circle>
+          <g class="phonegrp">
+            <rect class="clamp" x="66" y="94" width="9" height="36" rx="3"></rect>
+            <rect class="clamp" x="145" y="94" width="9" height="36" rx="3"></rect>
+            <rect class="phone" x="72" y="103" width="76" height="18" rx="5"></rect>
+            <polygon class="lens" points="110,84 119,100 101,100"></polygon>
+          </g>
+        </svg>
+      </div>
+      <h2>Step 3 &mdash; Home the pan</h2>
+      <p class="lead">This axis has no limit switch, so you set its reference by hand.
+        The pan motor is released &mdash; <b>turn the phone holder to face forward</b>,
+        then tap Set Home.</p>
+      <button class="btn" id="panHomeBtn">Set Home &mdash; this is <span id="panHomeDegTxt">180</span>&deg;</button>
+      <p class="homemsg" id="panHomingMsg"></p>
+      <p class="homehint">Forward becomes <b><span id="panHomeDegTxt2">180</span>&deg;</b>, the middle of
+        the pan range &mdash; that leaves a half turn of travel to either side of it.</p>
+    </div>
+
+  </div>
 </div>
 
 <script>
@@ -374,7 +525,7 @@ const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 let state = { homed:false, pos:0, panPos:0, progress:0 };
 
 // Geometry / shot config, seeded from /api/settings.
-let cfg = { maxTravelMm:300, panMaxDeg:360, sStart:0, sEnd:300, pStart:0, pEnd:360,
+let cfg = { maxTravelMm:300, panMaxDeg:360, panHomeDeg:180, sStart:0, sEnd:300, pStart:0, pEnd:360,
             maxSpeedMmS:50, panMaxSpeedDegS:90, jogSpeedMmS:30, panJogSpeedDegS:45 };
 let curMm = 0, curPan = 0;
 
@@ -384,8 +535,8 @@ $$('nav button').forEach(b => b.addEventListener('click', () => {
   $$('main section').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   $('#tab-' + b.dataset.tab).classList.add('active');
-  // The capture-pose bar only makes sense on the Auto screen.
-  $('.setbar').classList.toggle('hidden', b.dataset.tab !== 'auto');
+  // The capture-pose bar only makes sense on the Control screen.
+  $('.setbar').classList.toggle('hidden', b.dataset.tab !== 'control');
 }));
 
 // ---- API helper ----
@@ -414,124 +565,69 @@ function connectWs(){
 }
 
 /* =========================================================
-   Linear dual-thumb range
+   Position readouts (display only — the jog buttons move the axes)
    ========================================================= */
-const linRange = $('#linRange');
-function linPct(v){ return cfg.maxTravelMm > 0 ? (v / cfg.maxTravelMm * 100) : 0; }
+function linPct(v){ return cfg.maxTravelMm > 0 ? clamp(v / cfg.maxTravelMm * 100, 0, 100) : 0; }
+
+// Start/end markers and the shaded span between them. They are set from the
+// capture-pose bar, never dragged here.
 function renderLin(){
   const a = Math.min(cfg.sStart, cfg.sEnd), b = Math.max(cfg.sStart, cfg.sEnd);
-  $('#linStart').style.left = linPct(cfg.sStart) + '%';
-  $('#linEnd').style.left   = linPct(cfg.sEnd)   + '%';
-  $('#linFill').style.left  = linPct(a) + '%';
-  $('#linFill').style.width = (linPct(b) - linPct(a)) + '%';
-  $('#sStart').value = Math.round(cfg.sStart);
-  $('#sEnd').value   = Math.round(cfg.sEnd);
+  $('#linMarkS').style.left = linPct(cfg.sStart) + '%';
+  $('#linMarkE').style.left = linPct(cfg.sEnd)   + '%';
+  $('#linSpan').style.left  = linPct(a) + '%';
+  $('#linSpan').style.width = (linPct(b) - linPct(a)) + '%';
+  $('#linStartTxt').textContent = Math.round(cfg.sStart);
+  $('#linEndTxt').textContent   = Math.round(cfg.sEnd);
 }
-function renderLinCur(){ $('#linCur').style.left = clamp(linPct(curMm),0,100) + '%'; }
+function renderLinCur(){
+  $('#linDot').style.left = linPct(curMm) + '%';
+  $('#linVal').textContent = curMm.toFixed(1);
+}
 
-function dragThumb(el, key){
-  const track = linRange.querySelector('.track');
-  const move = e => {
-    const r = track.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-    let v = clamp(x / r.width, 0, 1) * cfg.maxTravelMm;
-    cfg[key] = Math.round(v);
-    renderLin();
-  };
-  const up = () => {
-    document.removeEventListener('pointermove', move);
-    document.removeEventListener('pointerup', up);
-    scheduleSave();   // persist the new range on the ESP32 when the drag ends
-  };
-  el.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
-  });
+/* ---- Rotary ring: the homed "forward" angle (cfg.panHomeDeg, 180°) sits at
+   the top, angles increasing clockwise. Homing to the middle of the 0..360
+   range leaves a half turn of travel on each side of forward. ---- */
+const DCX = 65, DCY = 65, DR = 48;
+function polar(ang, rad){
+  const r = (ang - cfg.panHomeDeg - 90) * Math.PI / 180;
+  return { x: DCX + rad * Math.cos(r), y: DCY + rad * Math.sin(r) };
 }
-dragThumb($('#linStart'), 'sStart');
-dragThumb($('#linEnd'), 'sEnd');
-$('#sStart').addEventListener('input', e => { cfg.sStart = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); scheduleSave(); });
-$('#sEnd').addEventListener('input',  e => { cfg.sEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.maxTravelMm); renderLin(); scheduleSave(); });
-
-/* =========================================================
-   Rotary dual-thumb dial
-   ========================================================= */
-const DCX=110, DCY=110, DR=82;
-function polar(ang){ // 0° at bottom, clockwise (dial flipped 180°)
-  const r = (ang + 90) * Math.PI / 180;
-  return { x: DCX + DR*Math.cos(r), y: DCY + DR*Math.sin(r) };
-}
-function polarR(ang, rad){ // same mapping at an arbitrary radius (for labels)
-  const r = (ang + 90) * Math.PI / 180;
-  return { x: DCX + rad*Math.cos(r), y: DCY + rad*Math.sin(r) };
-}
-function angleAt(clientX, clientY){
-  const svg = $('#dial');
-  const r = svg.getBoundingClientRect();
-  // map client coords into the 220x220 viewBox space
-  const x = (clientX - r.left) / r.width * 220;
-  const y = (clientY - r.top)  / r.height * 220;
-  let a = Math.atan2(y - DCY, x - DCX) * 180 / Math.PI - 90;
-  a = (a % 360 + 360) % 360;
-  return a;
-}
-function arcPath(a0, a1){
+function arcPath(a0, a1, rad){
   const cw = a1 >= a0;
-  const sweep = Math.abs(a1 - a0);
-  const large = sweep > 180 ? 1 : 0;
-  const p0 = polar(a0), p1 = polar(a1);
-  return `M ${p0.x} ${p0.y} A ${DR} ${DR} 0 ${large} ${cw?1:0} ${p1.x} ${p1.y}`;
+  const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+  const p0 = polar(a0, rad), p1 = polar(a1, rad);
+  return `M ${p0.x} ${p0.y} A ${rad} ${rad} 0 ${large} ${cw?1:0} ${p1.x} ${p1.y}`;
+}
+function setTick(el, ang){
+  const a = polar(ang, DR - 9), b = polar(ang, DR + 8);
+  el.setAttribute('x1', a.x); el.setAttribute('y1', a.y);
+  el.setAttribute('x2', b.x); el.setAttribute('y2', b.y);
 }
 function renderPan(){
-  const ps = polar(cfg.pStart), pe = polar(cfg.pEnd);
-  $('#panStartH').setAttribute('cx', ps.x); $('#panStartH').setAttribute('cy', ps.y);
-  $('#panEndH').setAttribute('cx', pe.x);   $('#panEndH').setAttribute('cy', pe.y);
-  // start/end name labels, sitting just inside their handles
-  const ls = polarR(cfg.pStart, 60), le = polarR(cfg.pEnd, 60);
-  $('#panStartTxt').setAttribute('x', ls.x); $('#panStartTxt').setAttribute('y', ls.y);
-  $('#panEndTxt').setAttribute('x', le.x);   $('#panEndTxt').setAttribute('y', le.y);
-  $('#panArc').setAttribute('d', arcPath(cfg.pStart, cfg.pEnd));
-  $('#pStart').value = Math.round(cfg.pStart);
-  $('#pEnd').value   = Math.round(cfg.pEnd);
+  $('#rotSpan').setAttribute('d', arcPath(cfg.pStart, cfg.pEnd, DR));
+  setTick($('#rotTickS'), cfg.pStart);
+  setTick($('#rotTickE'), cfg.pEnd);
+  $('#rotStartTxt').textContent = Math.round(cfg.pStart);
+  $('#rotEndTxt').textContent   = Math.round(cfg.pEnd);
 }
 function renderPanCur(){
-  const n = polar(curPan);
-  $('#panNeedle').setAttribute('x2', n.x);
-  $('#panNeedle').setAttribute('y2', n.y);
-  $('#panAngleTxt').textContent = Math.round(curPan) + '°';
+  const p = polar(curPan, DR);
+  $('#rotDot').setAttribute('cx', p.x);  $('#rotDot').setAttribute('cy', p.y);
+  $('#rotGlow').setAttribute('cx', p.x); $('#rotGlow').setAttribute('cy', p.y);
+  $('#rotVal').textContent = Math.round(curPan) + '°';
 }
-function dragHandle(el, key){
-  const move = e => {
-    const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    const cy = e.touches ? e.touches[0].clientY : e.clientY;
-    cfg[key] = clamp(Math.round(angleAt(cx, cy)), 0, cfg.panMaxDeg);
-    renderPan();
-  };
-  const up = () => {
-    document.removeEventListener('pointermove', move);
-    document.removeEventListener('pointerup', up);
-    scheduleSave();   // persist the new range on the ESP32 when the drag ends
-  };
-  el.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
-  });
-}
-dragHandle($('#panStartH'), 'pStart');
-dragHandle($('#panEndH'), 'pEnd');
-$('#pStart').addEventListener('input', e => { cfg.pStart = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); scheduleSave(); });
-$('#pEnd').addEventListener('input',  e => { cfg.pEnd   = clamp(parseFloat(e.target.value)||0, 0, cfg.panMaxDeg); renderPan(); scheduleSave(); });
 
-// ---- Go-to start/end buttons ----
-$$('.miniact button[data-edge]').forEach(b => b.addEventListener('click', () => {
-  const axis = b.dataset.axis;
-  let pos;
-  if (axis === 'slider') pos = (b.dataset.edge === 'start') ? cfg.sStart : cfg.sEnd;
-  else                   pos = (b.dataset.edge === 'start') ? cfg.pStart : cfg.pEnd;
-  wsSend({ t:'goto', axis, pos });
-}));
+// ---- Go to the stored start / end pose (fixed bottom bar) ----
+// One button per edge, not one per axis: both axes drive there together.
+// The firmware drives to its own stored pose, so flush any pending autosave
+// first — otherwise a capture made <400 ms ago would be ignored.
+async function goPose(edge) {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; await saveSettings(); }
+  wsSend({ t: edge === 'start' ? 'gostart' : 'goend' });
+}
+$('#goStart').addEventListener('click', () => goPose('start'));
+$('#goEnd').addEventListener('click',   () => goPose('end'));
 
 // ---- Use current pose as start / end (fixed bottom bar) ----
 // Captures the live position of BOTH axes and pushes it to the ESP32.
@@ -549,10 +645,13 @@ $('#useEnd').addEventListener('click', () => {
 // ---- Per-axis jog: press & hold (Left/Right under each path) ----
 // Jog speed comes from settings (clamped to the axis max speed).
 function bindJog(el, axis, dir) {
-  const speed = () => (axis === 'pan')
-    ? Math.min(cfg.panJogSpeedDegS, cfg.panMaxSpeedDegS)
-    : Math.min(cfg.jogSpeedMmS, cfg.maxSpeedMmS);
-  const start = e => { e.preventDefault(); wsSend({ t:'manual', action:'start', axis, dir, speed:speed() }); };
+  // The wizard's travel step jogs "free": past the stored rail length (which is
+  // exactly what it is there to measure) and at its own two-speed setting.
+  const free = el.dataset.free === '1';
+  const speed = () => free ? calSpeed()
+    : (axis === 'pan') ? Math.min(cfg.panJogSpeedDegS, cfg.panMaxSpeedDegS)
+                       : Math.min(cfg.jogSpeedMmS, cfg.maxSpeedMmS);
+  const start = e => { e.preventDefault(); wsSend({ t:'manual', action:'start', axis, dir, speed:speed(), free }); };
   const stop  = e => { e.preventDefault(); wsSend({ t:'manual', action:'stop', axis }); };
   el.addEventListener('mousedown', start);
   el.addEventListener('touchstart', start, {passive:false});
@@ -568,27 +667,18 @@ $$('.jogbtn').forEach(b => bindJog(b, b.dataset.jog, b.dataset.dir));
    ========================================================= */
 function applyStatus(s) {
   state = s;
-  $('#statText').textContent = s.stateText;
-  $('#posVal').textContent = s.pos.toFixed(1);
-  $('#panVal').textContent = (s.panPos||0).toFixed(1);
   curMm = s.pos; curPan = s.panPos || 0;
   renderLinCur(); renderPanCur();
 
-  const inAuto = s.stateRaw === 'AUTO_MOVE' || s.stateRaw === 'AUTO_REPOSITION' || s.stateRaw === 'AUTO_PAUSED';
-  let frac = inAuto ? s.progress : (cfg.maxTravelMm > 0 ? s.pos / cfg.maxTravelMm : 0);
-  frac = clamp(frac, 0, 1);
-  $('#progBar').style.width = (frac * 100).toFixed(1) + '%';
+  // The header badge carries the state on its own now; during an auto move it
+  // also carries the percentage the old progress bar used to show.
+  const inAuto = s.stateRaw === 'AUTO_MOVE' || s.stateRaw === 'AUTO_PAUSED';
+  const sb = $('#statText');
+  sb.textContent = inAuto ? s.stateText + ' ' + Math.round(clamp(s.progress,0,1) * 100) + '%'
+                          : s.stateText;
+  sb.classList.toggle('busy', s.stateRaw !== 'IDLE' && s.stateRaw !== 'BOOT');
 
-  if (s.homed) {
-    $('#lockOverlay').classList.add('hidden');
-  } else {
-    $('#lockOverlay').classList.remove('hidden');
-    const isHoming = s.stateRaw === 'HOMING';
-    $('#homeBtn').style.display     = isHoming ? 'none'  : 'block';
-    $('#skipHomeBtn').style.display = isHoming ? 'none'  : 'block';
-    $('#stopHomeBtn').style.display = isHoming ? 'block' : 'none';
-    $('#homingMsg').textContent = isHoming ? 'Finding limit switch...' : '';
-  }
+  renderHoming(s);
 
   // Stepper enable/disable toggle reflects the current hold state.
   const mb = $('#motorsBtn');
@@ -606,34 +696,141 @@ function applyStatus(s) {
 }
 connectWs();
 
-// ---- Homing ----
+/* =========================================================
+   Three-step setup gate, shown on every boot until it is walked through.
+
+   Step 1  home    — linear axis driven against the limit switch by the firmware.
+   Step 2  travel  — the user jogs to the far end of the rail (fast/slow) and
+                     stores the distance as maxTravelMm. The jog is "free" here:
+                     it ignores the stored limit, which is the thing being
+                     measured. Zero end stays protected by the limit switch.
+   Step 3  pan     — no switch on this axis, so the pan coils are released and
+                     the user aims the phone holder forward by hand; the angle
+                     they accept becomes cfg.panHomeDeg (180°).
+   Every axis stays energized once its reference is accepted.
+   ========================================================= */
+let panReleaseAt = 0;   // last time we asked the firmware to free the pan coils
+
+// Travel step: two jog speeds, so one button gets you down the rail and the
+// other creeps the last few millimetres up to the end stop.
+let calFast = true;
+function calSpeed(){
+  const fast = Math.min(cfg.jogSpeedMmS, cfg.maxSpeedMmS);
+  return calFast ? fast : Math.max(2, Math.round(fast / 5));
+}
+$$('#calSpeed button').forEach(b => b.addEventListener('click', () => {
+  calFast = b.dataset.speed === 'fast';
+  $$('#calSpeed button').forEach(x => x.classList.toggle('on', x === b));
+  $('#calSpeedVal').textContent = calSpeed();
+}));
+
+function renderCal(){
+  const mm = curMm.toFixed(1);
+  $('#calPos').textContent    = mm;
+  $('#calArtVal').textContent = mm + ' mm';
+  $('#calBtnVal').textContent = mm;
+  $('#calStored').textContent = Math.round(cfg.maxTravelMm);
+  $('#calSpeedVal').textContent = calSpeed();
+  $('#calKeepVal').textContent = Math.round(cfg.maxTravelMm);
+  // Below the firmware's minimum rail length there is nothing worth storing.
+  $('#calSetBtn').disabled = curMm < 10;
+}
+
+// Store the measured distance, then let the wizard move on.
+$('#calSetBtn').addEventListener('click', () => {
+  const mm = Math.round(curMm * 10) / 10;
+  if (mm < 10) return;
+  $('#calMsg').textContent = 'Travel limit set to ' + mm.toFixed(1) + ' mm.';
+  wsSend({ t:'settravel', mm });
+  loadSettings();          // pull the new limit back into cfg and the settings tab
+});
+$('#calKeepBtn').addEventListener('click', () => wsSend({ t:'settravel' }));
+
+function renderHoming(s) {
+  const ov = $('#lockOverlay');
+  const linDone = !!s.homed, travelDone = !!s.travelSet, rotDone = !!s.panHomed;
+
+  if (linDone && travelDone && rotDone) {   // fully set up: hand the UI over
+    ov.classList.add('hidden');
+    ov.classList.remove('running');
+    panReleaseAt = 0;
+    return;
+  }
+  ov.classList.remove('hidden');
+
+  const isHoming = s.stateRaw === 'HOMING';
+  ov.classList.toggle('running', isHoming);
+
+  const stage = !linDone ? 1 : !travelDone ? 2 : 3;
+
+  // step chips
+  $('#step1').className = 'st' + (stage > 1 ? ' done' : ' on');
+  $('#step2').className = 'st' + (stage > 2 ? ' done' : stage === 2 ? ' on' : '');
+  $('#step3').className = 'st' + (stage === 3 ? ' on' : '');
+  $('#stageLin').classList.toggle('on',    stage === 1);
+  $('#stageTravel').classList.toggle('on', stage === 2);
+  $('#stageRot').classList.toggle('on',    stage === 3);
+
+  if (stage === 2) renderCal();
+
+  if (!linDone) {
+    panReleaseAt = 0;
+    $('#homeBtn').style.display     = isHoming ? 'none'  : 'block';
+    $('#skipHomeBtn').style.display = isHoming ? 'none'  : 'block';
+    // Both only make sense while the carriage is actually running.
+    $('#stopHomeBtn').style.display = isHoming ? 'block' : 'none';
+    $('#wrongDirBtn').style.display = isHoming ? 'block' : 'none';
+    const msg = $('#homingMsg');
+    msg.textContent = isHoming ? 'Finding the limit switch…' : '';
+    msg.classList.toggle('live', isHoming);
+    return;
+  }
+
+  if (!travelDone) return;   // the travel step needs both axes held as they are
+
+  // Step 3: free the pan coils so the platform can be turned by hand. Status
+  // arrives ~10x a second, so this also retries if the first ask was refused
+  // (the firmware only releases an axis while the rig is at rest).
+  if (s.panPower && Date.now() - panReleaseAt > 1200) {
+    wsSend({ t:'axispower', axis:'pan', enabled:false });
+    panReleaseAt = Date.now();
+  }
+  const pm = $('#panHomingMsg');
+  pm.textContent = s.panPower ? 'Releasing the pan motor…'
+                              : 'Pan motor released — free to turn by hand.';
+  pm.classList.toggle('live', !s.panPower);
+}
+
 $('#homeBtn').addEventListener('click', () => {
-  $('#homingMsg').textContent = 'Moving to limit switch...';
+  $('#homingMsg').textContent = 'Moving to the limit switch…';
   wsSend({ t:'home' });
 });
 $('#skipHomeBtn').addEventListener('click', () => wsSend({ t:'skiphome' }));
 $('#stopHomeBtn').addEventListener('click', () => wsSend({ t:'estop' }));
+// Carriage running away from the switch = the motor is wired/configured
+// backwards. Flip the axis direction for good and start the run over.
+$('#wrongDirBtn').addEventListener('click', () => {
+  $('#homingMsg').textContent = 'Direction flipped — homing again…';
+  wsSend({ t:'homeflip' });
+});
+// Accepting the rotary zero also re-energizes the pan (firmware side).
+$('#panHomeBtn').addEventListener('click', () => {
+  $('#panHomingMsg').textContent = 'Zero set.';
+  wsSend({ t:'setzero', axis:'pan', pos:cfg.panHomeDeg });
+  loadSettings();   // the first load may have raced the boot; refresh the readouts
+});
 
 $('#motorsBtn').addEventListener('click', () => wsSend({ t:'motors', enabled: !state.motors }));
-$('#rehome').addEventListener('click', () => wsSend({ t:'home' }));                       // linear: limit-switch homing
-$('#rehomeRot').addEventListener('click', () => wsSend({ t:'setzero', axis:'pan' }));     // rotary: current angle becomes 0°
 
 // ---- Auto move ----
-// Per-axis enable toggles: leave an axis out of the move, and disable Start
-// when neither axis is selected.
-function updateAxisEnable(){
-  $('#autoStart').disabled = !($('#enLinear').checked || $('#enRotary').checked);
-}
-$('#enLinear').addEventListener('change', updateAxisEnable);
-$('#enRotary').addEventListener('change', updateAxisEnable);
-updateAxisEnable();
-
 $('#autoStart').addEventListener('click', () => {
   const unit = parseFloat($('#autoUnit').value) || 1;   // 1=sec, 60=min, 3600=hour
   const dur = (parseFloat($('#autoDur').value) || 0) * unit;   // seconds
+  // Both axes always take part; an axis whose start equals its end simply
+  // stays where it is.
   wsSend({
     t:'auto', action:'start', duration:dur,
-    enLin: $('#enLinear').checked, enRot: $('#enRotary').checked,
+    enLin:true, enRot:true,
     sStart:cfg.sStart, sEnd:cfg.sEnd,
     pStart:cfg.pStart, pEnd:cfg.pEnd
   });
@@ -648,8 +845,13 @@ $('#autoResume').addEventListener('click', () => wsSend({ t:'auto', action:'resu
 async function loadSettings() {
   const s = await api('/api/settings');
   if (!s) return;
-  cfg.maxTravelMm = s.maxTravelMm;
+  cfg.maxTravelMm = s.maxTravelMm;   // also relabels the travel step's buttons
   cfg.panMaxDeg   = s.panMaxDeg || 360;
+  cfg.panHomeDeg  = (s.panHomeDeg === undefined) ? 180 : s.panHomeDeg;
+  const homeTxt = Math.round(cfg.panHomeDeg);
+  $('#rotFwdTxt').textContent   = 'FWD ' + homeTxt + '°';
+  $('#panHomeDegTxt').textContent  = homeTxt;
+  $('#panHomeDegTxt2').textContent = homeTxt;
   cfg.maxSpeedMmS     = s.maxSpeedMmS || 50;
   cfg.panMaxSpeedDegS = s.panMaxSpeedDegS || 90;
   cfg.jogSpeedMmS     = s.jogSpeedMmS || 30;

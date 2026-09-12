@@ -34,6 +34,9 @@ void Slider_update();           // call frequently from loop()
 
 // ---- Commands ----
 bool Slider_startHoming();       // homes the linear axis (pan unaffected)
+// Called when the carriage runs AWAY from the switch: aborts the run, flips the
+// linear axis direction (caller persists settings.invertDir) and homes again.
+bool Slider_restartHoming();
 void Slider_skipHoming();        // skip homing: treat current positions as 0, unlock movement
 void Slider_stop();              // soft stop (use after manual release)
 void Slider_emergencyStop();     // stop all motion immediately
@@ -47,13 +50,25 @@ bool Slider_calibrateSpin(long steps);
 bool Slider_setMotorsEnabled(bool enabled);
 bool Slider_motorsEnabled();
 
+// Release/energize a SINGLE axis while the rig is at rest. Used by the rotary
+// homing step, which asks the user to turn the platform to face forward by hand:
+// the coils must be free for that. Any motion command re-energizes everything.
+bool Slider_setAxisPower(AxisId axis, bool on);
+bool Slider_axisPowered(AxisId axis);
+
 // Per-axis manual jog. speed is in the axis's own units/s (mm/s or deg/s).
-bool Slider_manualStart(AxisId axis, Direction d, float speed);
+// unbounded lifts the axis's normal travel ceiling (linear axis only) so the
+// setup wizard can drive past a stale maxTravelMm while measuring the real rail
+// length. The limit switch still guards the zero end.
+bool Slider_manualStart(AxisId axis, Direction d, float speed, bool unbounded = false);
 void Slider_manualStop(AxisId axis);
 
-// Define the axis's current physical position as its new zero (origin) without
-// moving. Accepting the slider's zero also unlocks movement (counts as homed).
-bool Slider_setZero(AxisId axis);
+// Define the axis's current physical position as posUnits (mm or deg) without
+// moving it. Accepting the slider's reference also unlocks movement (counts as
+// homed). The rotary axis homes to 180 deg, not 0, so the user keeps a half turn
+// of travel on both sides of "forward".
+bool Slider_setReference(AxisId axis, float posUnits);
+bool Slider_setZero(AxisId axis);   // == Slider_setReference(axis, 0)
 
 // Absolute move of one axis to a position in its own units (mm or deg).
 // Non-blocking; returns true if accepted.
@@ -79,7 +94,8 @@ SliderState Slider_state();
 float       Slider_position(AxisId axis);   // current position in axis units
 float       Slider_positionMm();            // == Slider_position(AXIS_SLIDER)
 float       Slider_axisMax(AxisId axis);    // usable range max (maxTravelMm / 360)
-bool        Slider_isHomed();
+bool        Slider_isHomed();               // linear axis referenced (limit switch / skip)
+bool        Slider_isPanHomed();            // rotary zero accepted by the user
 float       Slider_autoProgress();          // 0..1 during auto move
 const char* Slider_stateText();
 

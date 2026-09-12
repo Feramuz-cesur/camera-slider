@@ -20,6 +20,11 @@ static uint32_t g_rebootAt = 0;       // 0 = no pending reboot
 static uint16_t g_layerTotal   = 0;
 static uint16_t g_layerCurrent = 0;
 
+// Setup wizard: the rail length step is confirmed once per boot, like homing.
+// Not persisted - the wizard walks the user through all three steps on each
+// power-up, and "keep current" accepts the stored value in one tap.
+static bool g_travelSet = false;
+
 // Detailed state token used by our web UI
 static const char* stateShortName(SliderState s) {
     switch (s) {
@@ -60,8 +65,12 @@ static void buildStatus(String& out) {
     doc["stateText"] = Slider_stateText();
     doc["pos"]       = Slider_positionMm();       // slider mm
     doc["panPos"]    = Slider_position(AXIS_PAN);  // pan degrees
-    doc["homed"]     = Slider_isHomed();
+    doc["homed"]     = Slider_isHomed();       // linear axis referenced
+    doc["panHomed"]  = Slider_isPanHomed();    // rotary zero accepted
+    doc["travelSet"] = g_travelSet;            // rail length confirmed this boot
+    doc["maxTravelMm"] = settings.maxTravelMm; // so the wizard can label its buttons
     doc["motors"]    = Slider_motorsEnabled();
+    doc["panPower"]  = Slider_axisPowered(AXIS_PAN);
     doc["progress"]  = Slider_autoProgress();
     doc["layerTotal"]   = g_layerTotal;     // 0 = no print configured
     doc["layerCurrent"] = g_layerCurrent;   // last layer commanded
@@ -106,16 +115,44 @@ static void handleWsText(uint8_t num, uint8_t* payload, size_t length) {
             const char* dir = doc["dir"] | "";
             float defSpeed = (axis == AXIS_PAN) ? settings.panMaxSpeedDegS : settings.maxSpeedMmS;
             float speed = doc["speed"] | defSpeed;
-            Slider_manualStart(axis, strcmp(dir, "right") == 0 ? DIR_RIGHT : DIR_LEFT, speed);
+            // "free": the travel-calibration step drives past the stored rail length.
+            bool free = doc["free"] | false;
+            Slider_manualStart(axis, strcmp(dir, "right") == 0 ? DIR_RIGHT : DIR_LEFT, speed, free);
         } else if (strcmp(action, "stop") == 0) {
             Slider_manualStop(axis);
         }
     } else if (strcmp(t, "goto") == 0) {
         Slider_gotoPos(axisOf(), doc["pos"] | 0.0f);
     } else if (strcmp(t, "setzero") == 0) {
-        Slider_setZero(axisOf());
+        // "pos" lets the caller name the angle/position this pose stands for;
+        // the rotary homing step uses it to make "forward" 180 deg.
+        Slider_setReference(axisOf(), doc["pos"] | 0.0f);
     } else if (strcmp(t, "home") == 0) {
         Slider_startHoming();
+    } else if (strcmp(t, "homeflip") == 0) {
+        // "The carriage is going the wrong way": flip the linear axis direction
+        // for good (the same switch as Settings > Flip direction) and home again.
+        settings.invertDir = !settings.invertDir;
+        Settings_save();
+        if (!Slider_restartHoming()) sendError(num, "BUSY");
+    } else if (strcmp(t, "axispower") == 0) {
+        // Release/hold one axis at rest — the rotary homing step frees the pan
+        // so the platform can be turned to face forward by hand.
+        if (!Slider_setAxisPower(axisOf(), doc["enabled"] | true)) sendError(num, "BUSY");
+    } else if (strcmp(t, "settravel") == 0) {
+        // Wizard step 2. With "mm" the current carriage position becomes the new
+        // rail length; without it the stored value is simply accepted as-is.
+        if (doc["mm"].is<float>()) {
+            float mm = doc["mm"];
+            if (mm < 10.0f || mm > MAX_TRAVEL_LIMIT_MM) { sendError(num, "BAD_TRAVEL"); return; }
+            settings.maxTravelMm = mm;
+            // Keep the stored shot range inside the rail we just measured.
+            settings.startMm = constrain(settings.startMm, 0.0f, mm);
+            settings.endMm   = constrain(settings.endMm,   0.0f, mm);
+            Settings_save();
+            Slider_applySettings();
+        }
+        g_travelSet = true;
     } else if (strcmp(t, "skiphome") == 0) {
         Slider_skipHoming();
     } else if (strcmp(t, "estop") == 0) {
@@ -171,9 +208,13 @@ static void handleWsText(uint8_t num, uint8_t* payload, size_t length) {
         if (!Slider_gotoBoth(sPos, pPos)) { sendError(num, "BUSY"); return; }
         g_layerCurrent = (uint16_t)n;
     } else if (strcmp(t, "gostart") == 0) {
-        // Button 1: send both axes to their configured start positions.
+        // Send both axes to their configured start positions, together.
         if (!Slider_isHomed()) { sendError(num, "NOT_HOMED"); return; }
         if (!Slider_gotoBoth(settings.startMm, settings.panStartDeg)) { sendError(num, "BUSY"); return; }
+    } else if (strcmp(t, "goend") == 0) {
+        // ...and the same for the end pose.
+        if (!Slider_isHomed()) { sendError(num, "NOT_HOMED"); return; }
+        if (!Slider_gotoBoth(settings.endMm, settings.panEndDeg)) { sendError(num, "BUSY"); return; }
     } else if (strcmp(t, "simulate") == 0) {
         // Button 2: preview the move using the normal auto mode (default 25 s).
         if (!Slider_isHomed()) { sendError(num, "NOT_HOMED"); return; }
@@ -216,6 +257,7 @@ static void handleSettingsGet() {
     doc["panStartDeg"]     = settings.panStartDeg;
     doc["panEndDeg"]       = settings.panEndDeg;
     doc["panMaxDeg"]       = DEFAULT_PAN_MAX_DEG;
+    doc["panHomeDeg"]      = DEFAULT_PAN_HOME_DEG;   // angle the homed "forward" pose gets
     String out;
     serializeJson(doc, out);
     server.send(200, "application/json", out);
@@ -251,7 +293,7 @@ static void handleSettingsPost() {
     if (stepsPerRev < 1    || stepsPerRev > 20000){ server.send(400, "application/json", "{\"ok\":false}"); return; }
     float stepsPerMm = stepsPerRev / mmPerRev;
     if (stepsPerMm  < 1 || stepsPerMm  > 3200)  { server.send(400, "application/json", "{\"ok\":false}"); return; }
-    if (maxTravelMm < 10 || maxTravelMm > 2000) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+    if (maxTravelMm < 10 || maxTravelMm > MAX_TRAVEL_LIMIT_MM) { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (maxSpeedMmS < 1 || maxSpeedMmS > 500)   { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (accelMmS2   < 1 || accelMmS2   > 5000)  { server.send(400, "application/json", "{\"ok\":false}"); return; }
     if (homingSpeed < 1 || homingSpeed > 500)   { server.send(400, "application/json", "{\"ok\":false}"); return; }

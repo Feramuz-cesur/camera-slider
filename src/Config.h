@@ -92,6 +92,10 @@
 #define DEFAULT_STEPS_PER_REV   (MOTOR_FULL_STEPS_PER_REV * DRIVER_MICROSTEP)  // 3200
 #define DEFAULT_MM_PER_REV      40.0f    // GT2 20T pulley travel per turn
 #define DEFAULT_MAX_TRAVEL_MM   300.0f
+// Hard ceiling for the rail length. It bounds what the setup wizard's travel
+// calibration may jog to (the stored maxTravelMm is unknown/too small at that
+// point, so the normal jog ceiling cannot be used) and what /api/settings accepts.
+#define MAX_TRAVEL_LIMIT_MM     2000.0f
 #define DEFAULT_MAX_SPEED_MMS   50.0f    // NEMA 17 + A4988 handles much higher rates
 #define DEFAULT_ACCEL_MMS2      80.0f
 #define DEFAULT_JOG_SPEED_MMS   30.0f    // manual jog speed (mm/s)
@@ -113,6 +117,11 @@
 #define DEFAULT_PAN_ACCEL_DEGS2    180.0f  // deg/s^2
 #define DEFAULT_PAN_JOG_SPEED_DEGS 45.0f   // manual jog speed (deg/s)
 #define DEFAULT_PAN_INVERT_DIR     false
+// Angle the rotary axis is given when the user accepts its home position. The
+// platform has no limit switch: the user turns the phone holder to face forward
+// and that pose becomes this angle. 180 puts "forward" in the middle of the
+// 0..360 range, so there is a full half turn of travel available either way.
+#define DEFAULT_PAN_HOME_DEG       180.0f
 #define DEFAULT_PAN_START_DEG      0.0f
 #define DEFAULT_PAN_END_DEG        360.0f
 
