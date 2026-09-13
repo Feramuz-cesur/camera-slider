@@ -119,10 +119,11 @@ static void axisPower(AxisId a, bool on) {
 }
 
 // Apply coil power for a given state. Motors are kept energized whenever
-// holdEnabled is set (the default), so they hold position even when idle and
-// stay on after a move completes. Starting any motion re-arms the hold flag, so
-// a one-shot "disable" only lasts until the next command. The user can release
-// the coils on demand via Slider_setMotorsEnabled(false).
+// holdEnabled is set, so they hold position even when idle and stay on after a
+// move completes. Starting any motion re-arms the hold flag, so both the
+// released-at-boot state and a one-shot "disable" last only until the next
+// command. The user can release the coils on demand via
+// Slider_setMotorsEnabled(false).
 static void applyPowerFor(SliderState s) {
     bool moving = !(s == STATE_IDLE || s == STATE_BOOT || s == STATE_FAULT);
     if (moving) {
@@ -153,7 +154,13 @@ void Slider_begin() {
     for (int i = 0; i < AXIS_COUNT; i++) configureAxis((AxisId)i);
     state = STATE_BOOT;
     homed = false;
-    applyPowerFor(state);   // energize and hold from power-on (holdEnabled default true)
+    // Come up with both axes released. Nothing is referenced yet at power-on, so
+    // holding torque buys nothing: it only heats the motors and drivers, loads
+    // the supply, and stops the user from moving the carriage by hand while
+    // setting the rig up. The first motion command (homing, or a jog from the
+    // wizard) re-arms the hold - see applyPowerFor().
+    holdEnabled = false;
+    applyPowerFor(state);
 }
 
 bool Slider_setMotorsEnabled(bool enabled) {
