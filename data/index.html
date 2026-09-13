@@ -51,6 +51,18 @@
     padding:16px;box-shadow:0 2px 10px rgba(255,184,77,.25)}
   .btn.motorsbtn.off{background:var(--bad);color:#fff;box-shadow:0 2px 10px rgba(255,93,108,.3)}
   .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ---- Press feedback (all buttons) ----
+     Only transform + filter are set globally, so every button keeps whatever
+     :active colour it already defines (jog, set-bar, segments) and simply
+     dips and darkens on top of it. */
+  button,.btn{transition:transform .09s ease,filter .12s ease,background .12s ease}
+  button:active:not(:disabled),.btn:active:not(:disabled){transform:scale(.97);filter:brightness(.88)}
+  /* transparent buttons have no fill to darken — tint them instead */
+  nav button:active,.seg button:active:not(.on),.btn.ghost:active{background:rgba(78,161,255,.10)}
+  @media (prefers-reduced-motion:reduce){
+    button:active:not(:disabled),.btn:active:not(:disabled){transform:none}
+  }
   .field{display:flex;justify-content:space-between;align-items:center;margin:10px 0}
   .field label{color:var(--muted);font-size:13px}
   .field input,.field select{background:#0f1218;border:1px solid var(--line);color:var(--text);
@@ -74,8 +86,8 @@
     background:#1d2230;color:var(--text);font:inherit;font-size:20px;font-weight:600;
     display:flex;align-items:center;justify-content:center;cursor:pointer;
     touch-action:none;-webkit-user-select:none;user-select:none;
-    transition:background .08s,transform .08s}
-  .jogbtn:active{background:var(--accent2);transform:scale(.96)}
+    transition:background .08s,transform .08s,filter .12s}
+  .jogbtn:active:not(:disabled){background:var(--accent2);transform:scale(.96)}
   /* Locked out while another jog button is held (one axis at a time). Kept
      deliberately invisible: a jog button looks identical whether it is live or
      not, so the row never flickers while you are driving an axis. */
@@ -208,7 +220,9 @@
     text-decoration:underline;text-underline-offset:3px}
 </style>
 </head>
-<body>
+<!-- empty touchstart handler: iOS Safari only applies :active to elements
+     that (or whose ancestor) listen for touch, so this enables the press effect -->
+<body ontouchstart="">
 
 <header>
   <h1>Camera Slider</h1>

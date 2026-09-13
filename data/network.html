@@ -53,6 +53,15 @@
   .btn.secondary{background:#1d2230;color:var(--text)}
   .btn.tiny{width:auto;padding:7px 12px;margin:0;font-size:12px;border-radius:8px}
   .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ---- Press feedback (all buttons + the network rows) ---- */
+  button,.btn,.net{transition:transform .09s ease,filter .12s ease,
+    background .12s ease,border-color .12s ease}
+  button:active:not(:disabled),.btn:active:not(:disabled),
+  .net:active{transform:scale(.97);filter:brightness(.88)}
+  @media (prefers-reduced-motion:reduce){
+    button:active:not(:disabled),.btn:active:not(:disabled),.net:active{transform:none}
+  }
   .row{display:flex;justify-content:space-between;align-items:center;margin:6px 0}
   .row .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
   .row .val{font-weight:600}
@@ -76,7 +85,9 @@
   .msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
 </style>
 </head>
-<body>
+<!-- empty touchstart handler: iOS Safari only applies :active to elements
+     that (or whose ancestor) listen for touch, so this enables the press effect -->
+<body ontouchstart="">
 
 <header>
   <h1>Camera Slider</h1>
