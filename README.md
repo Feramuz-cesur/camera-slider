@@ -18,6 +18,16 @@ tarayıcısından çalışan web arayüzüyle yapılır — uygulama kurmak gere
 - **OLED:** kart üzerindeki 0.42" ekranda IP adresi ve durum bilgisi
 - Adım üretimi [FastAccelStepper](https://github.com/gin66/FastAccelStepper) ile donanım destekli
 
+## İlk kullanım
+
+1. Cihaza güç verin. Kayıtlı bir ağ yoksa **`CameraSlider`** isimli hotspot'u açar
+   (şifre `12345678`).
+2. Telefonunuzla bu ağa bağlanın. Kurulum sayfası kendiliğinden açılır; açılmazsa
+   tarayıcıya elle **`http://192.168.4.1`** yazın (başındaki `http://` önemli).
+3. Listeden ev ağınızı seçip şifresini girin. Cihaz yeniden bağlanır.
+4. Bundan sonra kontrol arayüzüne **`http://camera-slider.local`** adresinden
+   ulaşırsınız — IP adresi kart üzerindeki OLED ekranda da yazar.
+
 ## Donanım
 
 | Parça | Açıklama |
@@ -64,14 +74,7 @@ https://github.com/user-attachments/assets/d8921941-d690-4528-93d0-fbbbbc627310
 
 <img width="1466" height="2074" alt="Frame 1" src="https://github.com/user-attachments/assets/ec740015-4355-45ba-8490-a4e8b3fd0109" />
 
-
-[Frame 1.pdf](https://github.com/user-attachments/files/31151227/Frame.1.pdf)
-
-
 <img width="1465" height="2074" alt="Frame 2" src="https://github.com/user-attachments/assets/8a91249f-68a4-4359-85e3-f160da155c34" />
-
-[Frame 2.pdf](https://github.com/user-attachments/files/31151425/Frame.2.pdf)
-
 
 ### 3D baskı parçaları
 
@@ -89,19 +92,12 @@ dosyasına bakın.
 
 #### Telefon tutucu — atıf
 
-`3d-models/telefon-tutucu/` klasöründeki modeller **bana ait değildir**.
-Bu parçalar [HeyVye](https://www.thingiverse.com/thing:2194278) tarafından
-tasarlanan **Modular Mounting System** projesine aittir ve Creative Commons —
-Attribution (CC BY) lisansıyla yayınlanmıştır.
-
-Bu modelleri kendim tasarlamadım; projede yalnızca **destekleyici bir eleman**
-olarak kullandım ve kullanıcı tek tek aramak zorunda kalmasın diye orijinal
-kaynaktan indirip repoya ekledim. Tasarımın tüm emeği ve hakları orijinal
-tasarımcıya aittir.
-
-**Bu kısmın montajı için orijinal tasarımcının sayfasındaki talimatları
-uygulayabilirsiniz:** https://www.thingiverse.com/thing:2194278
-(Modüller M5 cıvata/somun ile birleşir, bağlantı noktası GoPro uyumludur.)
+`3d-models/telefon-tutucu/` içindeki modeller bana ait değil:
+[HeyVye](https://www.thingiverse.com/thing:2194278) tarafından tasarlanan
+**Modular Mounting System** projesinden, Creative Commons Attribution (CC BY)
+lisansıyla. Kullanıcı ayrıca aramak zorunda kalmasın diye repoya ekledim.
+Bu kısmın montajı için orijinal sayfadaki talimatları izleyin — modüller M5
+cıvata/somun ile birleşir, bağlantı noktası GoPro uyumludur.
 
 ## Mekanik / kalibrasyon varsayılanları
 
@@ -118,9 +114,8 @@ pio run -t upload          # firmware
 pio run -t uploadfs        # web arayüzü (data/ → LittleFS)
 ```
 
-İlk açılışta cihaz `CameraSlider` isimli hotspot açar (şifre `12345678`).
-Bağlanınca açılan sayfadan ev ağı bilgileri girilir; sonrasında cihaza
-`http://camera-slider.local` adresinden erişilir.
+İkisini de yükledikten sonra cihaz açılışta hotspot'unu açar — devamı için
+[İlk kullanım](#ilk-kullanım) bölümüne bakın.
 
 ## Proje yapısı
 
@@ -131,6 +126,12 @@ docs/           Bağlantı şeması (PNG + PDF, Fritzing çizimi)
 3d-models/      Basılacak parçaların STL dosyaları
 platformio.ini  Derleme yapılandırması
 ```
+
+## Lisans
+
+Bu projenin kaynak kodu ve tasarım dosyaları MIT lisansı altındadır — bkz.
+[LICENSE](LICENSE). `3d-models/telefon-tutucu/` klasörü istisnadır; o parçalar
+üçüncü tarafa ait olup CC BY lisansıyla dağıtılır (yukarıdaki atfa bakın).
 
 ## Teşekkür
 
