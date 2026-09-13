@@ -87,12 +87,17 @@
     display:flex;align-items:center;justify-content:center;cursor:pointer;
     touch-action:none;-webkit-user-select:none;user-select:none;
     transition:background .05s,transform .05s,filter .07s}
-  .jogbtn:active:not(:disabled){background:var(--accent2);transform:scale(.96)}
+  /* The jog handlers call preventDefault() on touchstart (to stop scrolling and
+     long-press selection while driving an axis), and that also stops the browser
+     from ever applying :active on touch. So the press look is driven by a class
+     the handlers set; :active is kept for mouse. */
+  .jogbtn:active:not(:disabled),.jogbtn.pressed{
+    background:var(--accent2);transform:scale(.96);filter:brightness(.88)}
   /* Locked out while another jog button is held (one axis at a time). Kept
      deliberately invisible: a jog button looks identical whether it is live or
      not, so the row never flickers while you are driving an axis. */
   .jogbtn.locked{pointer-events:none}
-  .jogrow.rot .jogbtn:active{background:var(--pan2)}
+  .jogrow.rot .jogbtn:active,.jogrow.rot .jogbtn.pressed{background:var(--pan2)}
   .jogview{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px}
   .jogval{font-variant-numeric:tabular-nums;font-weight:700;font-size:20px;letter-spacing:.5px}
   .jogval.lin{color:var(--accent)}
@@ -683,11 +688,13 @@ function bindJog(el, axis, dir) {
   const start = e => {
     e.preventDefault();
     if (jogHeld) return;                 // another button is already down
+    el.classList.add('pressed');         // see .jogbtn.pressed in the stylesheet
     lockJogs(el);
     wsSend({ t:'manual', action:'start', axis, dir, speed:speed(), free });
   };
   const stop = e => {
     if (e) e.preventDefault();
+    el.classList.remove('pressed');
     if (jogHeld !== el) return;          // not the button that started this move
     lockJogs(null);
     wsSend({ t:'manual', action:'stop', axis });
