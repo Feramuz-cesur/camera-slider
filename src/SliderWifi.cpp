@@ -2,6 +2,7 @@
 #include "Config.h"
 
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <DNSServer.h>
 #include <LittleFS.h>
@@ -22,6 +23,7 @@ static uint8_t    g_scanAccCount = 0;  // APs collected so far this sweep
 static uint8_t    g_scanChan   = 0;    // channel being scanned right now (0 = between channels)
 static uint8_t    g_scanNextCh = 1;    // next channel to visit
 static uint32_t   g_scanNextAt = 0;    // millis() the next channel may start at
+static uint32_t   g_scanChanAt = 0;    // millis() the in-flight channel scan was started
 
 static bool loadCreds(String& ssid, String& pass) {
     File f = LittleFS.open(WIFI_CREDS_FILE, "r");
@@ -137,6 +139,7 @@ void Wifi_scanStart() {
     // Every sweep still costs the AP some time off-channel, so a page asking for
     // refreshes in a tight loop must not be able to keep it there.
     if (g_scanDone && millis() - g_scanDone < WIFI_SCAN_MIN_PERIOD_MS) return;
+    WiFi.scanDelete();   // drop a stale result buffer from an earlier sweep
     g_scanAccCount = 0;
     g_scanChan     = 0;
     g_scanNextCh   = 1;
@@ -150,7 +153,18 @@ static void scanStep() {
 
     if (g_scanChan) {                       // a channel scan is in flight
         int16_t n = WiFi.scanComplete();
-        if (n == WIFI_SCAN_RUNNING) return;
+        if (n == WIFI_SCAN_RUNNING) {
+            // A scan that never reports back is not just a missing network list:
+            // the radio stays parked on that channel, so the AP is gone for good
+            // and clients cannot even complete DHCP. Nothing clears this by
+            // itself, so abandon the channel and force the radio back home.
+            if ((int32_t)(now - g_scanChanAt) < WIFI_SCAN_CHANNEL_TIMEOUT_MS) return;
+            esp_wifi_scan_stop();
+            WiFi.scanDelete();
+            g_scanChan   = 0;
+            g_scanNextAt = now + WIFI_SCAN_CHANNEL_GAP_MS;
+            return;
+        }
         for (int i = 0; i < n; i++)         // n < 0 on failure -> loop does not run
             mergeAp(WiFi.SSID(i), WiFi.RSSI(i), WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
         WiFi.scanDelete();
@@ -170,7 +184,8 @@ static void scanStep() {
 
     if (WiFi.scanNetworks(true /*async*/, false /*hidden*/, false /*active*/,
                           WIFI_SCAN_DWELL_MS, g_scanNextCh) == WIFI_SCAN_RUNNING) {
-        g_scanChan = g_scanNextCh;
+        g_scanChan   = g_scanNextCh;
+        g_scanChanAt = now;
     } else {
         g_scanNextAt = now + WIFI_SCAN_CHANNEL_GAP_MS;   // could not start; skip on
     }

@@ -73,6 +73,11 @@
 #define WIFI_SCAN_LAST_CHANNEL   13     // 2.4 GHz channels 1..13
 #define WIFI_SCAN_MIN_PERIOD_MS  6000   // ignore refresh requests fired faster than this
 #define WIFI_SCAN_MAX_RESULTS    30
+// A channel scan that never reports back leaves the radio parked off the AP
+// channel indefinitely - the AP simply vanishes and clients cannot even get a
+// DHCP lease, with nothing to recover it short of a power cycle. Abandon a
+// channel that takes longer than this (dwell is 150 ms, so this is ~13x slack).
+#define WIFI_SCAN_CHANNEL_TIMEOUT_MS 2000
 // The portal page also holds its first automatic sweep back a few seconds (see
 // network.html), so a phone that has just joined can finish DHCP and its
 // captive-portal probe before the radio starts hopping channels.
