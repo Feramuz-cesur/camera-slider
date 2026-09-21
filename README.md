@@ -28,6 +28,14 @@ tarayıcısından çalışan web arayüzüyle yapılır — uygulama kurmak gere
 4. Bundan sonra kontrol arayüzüne **`http://camera-slider.local`** adresinden
    ulaşırsınız — IP adresi kart üzerindeki OLED ekranda da yazar.
 
+## Arayüz
+
+<img width="1462" height="2135" alt="Arayüz" src="https://github.com/user-attachments/assets/22bc36cf-856d-4590-90e5-947790ff498f" />
+
+## PrintLapse ile kullanım
+
+ DÜZENLENECEK !!
+
 ## Donanım
 
 | Parça | Açıklama |
