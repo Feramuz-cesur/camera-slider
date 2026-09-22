@@ -80,9 +80,10 @@ Yüksek çözünürlüklü PDF: [docs/baglanti-semasi.pdf](docs/baglanti-semasi.
 
 https://github.com/user-attachments/assets/d8921941-d690-4528-93d0-fbbbbc627310
 
-<img width="1466" height="2074" alt="Frame 1" src="https://github.com/user-attachments/assets/ec740015-4355-45ba-8490-a4e8b3fd0109" />
+<img width="1466" height="2074" alt="png 1" src="https://github.com/user-attachments/assets/6fcbd022-65e0-4f87-8ea6-d9b08254046a" />
 
-<img width="1465" height="2074" alt="Frame 2" src="https://github.com/user-attachments/assets/8a91249f-68a4-4359-85e3-f160da155c34" />
+<img width="1465" height="2074" alt="png 2" src="https://github.com/user-attachments/assets/5dc0f62a-4d5b-467c-b50d-c03cbb236b7f" />
+
 
 ### 3D baskı parçaları
 
