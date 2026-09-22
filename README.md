@@ -47,6 +47,21 @@ tarayıcısından çalışan web arayüzüyle yapılır — uygulama kurmak gere
 | Lever limit switch (JL012-13.5-2) | Lineer eksen sıfır noktası |
 | 12V adaptör + barrel jack | Motor beslemesi |
 
+### Mekanik / bağlantı malzemeleri
+
+| Parça | Adet | Not |
+|---|---|---|
+| 20 × 40 mm sigma profil, 300 mm | 1 | Slider gövdesi |
+| 8 mm çap, 300 mm lineer mil | 2 | Araba kızağı |
+| LM8UU lineer rulman | 2 | 8 mm mil için |
+| M3 × 10 mm cıvata | 17 | Genel montaj |
+| M3 × 25 mm cıvata | 2 | — |
+| M3 somun | 4 | — |
+| M3 insert somun (ısıyla gömme) | 7 | 3D baskı parçalara gömülür |
+| M5 × 25 mm cıvata | 1 | Telefon tutucu bağlantısı |
+| M5 somun | 1 | Telefon tutucu bağlantısı |
+| 30 × 70 mm delikli pertinaks | 1 | Sürücü/kablo bağlantı kartı |
+
 ## Bağlantı şeması
 
 ![Bağlantı şeması](docs/baglanti-semasi.png)
