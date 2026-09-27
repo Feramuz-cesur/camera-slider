@@ -74,6 +74,8 @@ static void buildStatus(String& out) {
     doc["progress"]  = Slider_autoProgress();
     doc["layerTotal"]   = g_layerTotal;     // 0 = no print configured
     doc["layerCurrent"] = g_layerCurrent;   // last layer commanded
+    doc["startSet"]  = Settings_startSet();    // user captured a start pose
+    doc["endSet"]    = Settings_endSet();      // ...and an end pose
     serializeJson(doc, out);
 }
 
@@ -192,8 +194,10 @@ static void handleWsText(uint8_t num, uint8_t* payload, size_t length) {
         // Print started: remember the total layer count. No movement here.
         int total = doc["total"] | 0;
         if (total < 1) { sendError(num, "BAD_TOTAL"); return; }
-        g_layerTotal   = (uint16_t)total;
-        g_layerCurrent = 0;
+        // The app re-sends this on every reconnect; only a new print (a different
+        // total) resets the progress, otherwise a reconnect would zero the counter.
+        if ((uint16_t)total != g_layerTotal) g_layerCurrent = 0;
+        g_layerTotal = (uint16_t)total;
     } else if (strcmp(t, "layer") == 0) {
         // Layer changed: map layer n -> position on both axes and move there.
         if (g_layerTotal < 1)       { sendError(num, "NO_SETUP");  return; }
@@ -323,6 +327,9 @@ static void handleSettingsPost() {
     settings.panEndDeg       = constrain(panEndDeg,   0.0f, DEFAULT_PAN_MAX_DEG);
     Settings_save();
     Slider_applySettings();
+    // Every autosave carries startMm/endMm, so their presence means nothing;
+    // the page flags the save that follows a "Use as Start/End" tap.
+    Settings_markRange(doc["startSet"] | false, doc["endSet"] | false);
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -441,6 +448,10 @@ void Web_begin() {
     // WebSocket: live status push + low-latency control commands.
     ws.begin();
     ws.onEvent(onWsEvent);
+    // Drop dead clients (phone left the network, app killed) within ~10 s instead
+    // of waiting for TCP to give up. Without this, half-open sockets pile up in the
+    // 5 client slots and a reconnecting app gets refused.
+    ws.enableHeartbeat(4000, 3000, 2);
 }
 
 void Web_loop() {
@@ -452,7 +463,7 @@ void Web_loop() {
     uint32_t now = millis();
     if (now - lastPush >= 100) {
         lastPush = now;
-        broadcastStatus();
+        if (ws.connectedClients() > 0) broadcastStatus();
     }
 
     if (g_rebootAt && (int32_t)(now - g_rebootAt) >= 0) {

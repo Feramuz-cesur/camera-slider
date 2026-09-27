@@ -44,6 +44,11 @@
 // ~20 dBm the RF output distorts and clients cannot complete association with
 // the AP (and STA connects get flaky). ~8.5 dBm is the widely used sweet spot.
 #define WIFI_TX_POWER   WIFI_POWER_8_5dBm
+// Station mode talks to the home router, which is usually much farther away than
+// the phone is from our AP. At 8.5 dBm the ESP->router direction loses packets and
+// the app's WebSocket drops (missed pongs). Use more power here; if STA gets flaky
+// at this level, suspect the supply/decoupling before lowering it again.
+#define WIFI_STA_TX_POWER   WIFI_POWER_15dBm
 
 // ---------- WiFi scan (provisioning page) ----------
 // The scan is ASYNCHRONOUS and swept ONE CHANNEL AT A TIME, for two reasons:
@@ -82,8 +87,34 @@
 // network.html), so a phone that has just joined can finish DHCP and its
 // captive-portal probe before the radio starts hopping channels.
 
+// The captive-portal DNS answers one query per call. A phone that has just
+// joined fires a burst of lookups at once; handled one per loop pass, the
+// overflow is dropped by lwIP (small UDP mailbox), the phone's connectivity
+// probe never resolves, and no "sign in to network" prompt appears. Drain up to
+// this many per loop pass instead.
+#define WIFI_DNS_BURST       8
+
 // ---------- WiFi Station (connect to your network) ----------
-#define WIFI_STA_TIMEOUT_MS  15000       // give up after this and fall back to AP
+// The boot connect is driven as explicit attempts inside a time budget. The
+// Arduino core retries a failed connect only ONCE per boot, and never after
+// AUTH_FAIL (202) - which the ESP32 reports spuriously on weak links. A single
+// WiFi.begin() therefore used to sit out the whole timeout doing nothing and
+// fall back to AP ("it only connects after I press reset"). Now every failure
+// starts a fresh attempt until the budget is used up.
+#define WIFI_STA_TIMEOUT_MS     22500   // total budget, then fall back to AP (was 15000: +50%)
+#define WIFI_STA_ATTEMPT_MS     6000    // restart an attempt that has not even associated by then
+#define WIFI_STA_RETRY_GAP_MS   500     // let the driver settle between attempts
+#define WIFI_STA_DHCP_GRACE_MS  4000    // associated as the budget ran out: let DHCP finish
+// Once connected: the core only auto-reconnects for some disconnect reasons.
+// If the link stays down this long, start a new attempt ourselves.
+#define WIFI_STA_WATCHDOG_MS    10000
+// AP fallback with saved credentials: retry the home network while nobody is on
+// the AP, so a router that was slow to boot (or one flaky attempt) does not leave
+// the slider stuck in AP mode until someone presses reset. A try takes the radio
+// off the AP channel, so it runs only with zero AP clients and is dropped the
+// moment one joins (see rule 1 of the AP notes: the STA side must stay quiet).
+#define WIFI_AP_RETRY_PERIOD_MS  60000  // AP idle this long -> try the saved network
+#define WIFI_AP_RETRY_ATTEMPT_MS 8000   // give that try this long
 #define MDNS_HOST            "camera-slider"   // reachable as camera-slider.local
 #define DEVICE_NAME          "Fergineer Slider"  // user-visible device name
 #define WIFI_CREDS_FILE      "/wifi.json"      // saved credentials on LittleFS

@@ -17,6 +17,41 @@ static const uint8_t  SCROLL_GAP     = 16;   // blank gap between repeats of the
 
 static int16_t scrollX = SCREEN_W;           // marquee position; start off the right edge
 
+static void drawCentered(int16_t y, const char* s) {
+    u8g2.drawStr((SCREEN_W - u8g2.getStrWidth(s)) / 2, y, s);
+}
+
+// Boot connect in progress: the attempt number, big, plus a bar for the time
+// budget, so a slow join is visibly working instead of looking frozen.
+static void drawConnecting() {
+    char num[4];
+    snprintf(num, sizeof(num), "%u", Wifi_attempt());
+
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_5x7_tr);
+    drawCentered(7, "Connecting");
+    u8g2.setFont(u8g2_font_logisoso26_tn);   // digits only, ~26px tall, like the IP
+    drawCentered(36, num);
+    u8g2.drawBox(0, SCREEN_H - 2, (SCREEN_W * Wifi_progress()) / 100, 2);
+    u8g2.sendBuffer();
+}
+
+// AP fallback: what the user needs to join it - that we are in AP mode, the
+// network to pick and its password. (The portal opens by itself once joined.)
+static void drawApInfo() {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawBox(0, 0, SCREEN_W, 9);          // inverted header: reads as a state
+    u8g2.setDrawColor(0);
+    drawCentered(7, "AP MODE");
+    u8g2.setDrawColor(1);
+    drawCentered(17, AP_SSID);
+    drawCentered(26, "password:");
+    u8g2.setFont(u8g2_font_8x13B_tr);
+    drawCentered(39, AP_PASSWORD);
+    u8g2.sendBuffer();
+}
+
 // Render one frame. Runs only on the display task (sole owner of the u8g2 buffer
 // and the I2C bus), so no locking is needed against the main loop.
 static void drawFrame() {
@@ -25,8 +60,10 @@ static void drawFrame() {
     // this task on a semaphore during the ~8ms transfer, which lets the stepper
     // task keep running on the single core, so step timing isn't starved.
 
+    if (Wifi_connecting()) { drawConnecting(); return; }
+    if (Wifi_apActive())   { drawApInfo();     return; }
     // Until the radio is up, leave the boot splash in place.
-    if (!Wifi_isStation() && !Wifi_apActive()) return;
+    if (!Wifi_isStation()) return;
 
     // Once on the network, the only thing worth showing is the address to type
     // into the browser. Big font (~2/3 of the 40px height), vertically centred.

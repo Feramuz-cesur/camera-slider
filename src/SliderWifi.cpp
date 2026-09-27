@@ -12,6 +12,23 @@ static bool       g_sta = false;
 static bool       g_ap  = false;
 static DNSServer  dnsServer;   // captive portal: resolves every host to the AP IP
 
+static String     g_ssid, g_pass;   // saved network (empty ssid = none saved)
+
+// Boot connect progress, read by the display task.
+static volatile bool    g_connecting = false;
+static volatile uint8_t g_attempt    = 0;
+static volatile uint8_t g_progress   = 0;
+
+// Driver events arrive on the WiFi event task.
+static volatile bool     g_linkUp     = false;   // associated with the router (IP may be pending)
+static volatile uint32_t g_failSeq    = 0;       // bumped on every real connect failure / drop
+static volatile uint8_t  g_failReason = 0;
+
+static uint32_t   g_staDownSince = 0;   // STA mode: when the link went down (0 = up)
+static uint32_t   g_apIdleSince  = 0;   // AP mode: last time a client was on the AP
+static uint32_t   g_apTryAt      = 0;   // AP mode: background STA try in flight since (0 = none)
+static uint32_t   g_apTrySeq     = 0;
+
 // Async scan state (see Config.h for why the sweep is split per channel).
 struct ScanEntry { String ssid; int32_t rssi; bool lock; };
 
@@ -62,37 +79,160 @@ static void startAP() {
     dnsServer.start(53, "*", WiFi.softAPIP());
     g_ap  = true;
     g_sta = false;
+    g_apIdleSince = millis();
+    g_apTryAt     = 0;
+}
+
+static void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
+    if (event == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
+        g_linkUp = true;
+    } else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+        g_linkUp = false;
+        uint8_t reason = info.wifi_sta_disconnected.reason;
+        // ASSOC_LEAVE is a disconnect() we (or the core) asked for before the
+        // next begin() - not a failure of the attempt in progress.
+        if (reason != WIFI_REASON_ASSOC_LEAVE) {
+            g_failReason = reason;
+            g_failSeq++;
+        }
+    }
+}
+
+static const char* failText() {
+    return g_failReason ? WiFi.disconnectReasonName((wifi_err_reason_t)g_failReason) : "timeout";
+}
+
+// Station link is up: switch the rest of the firmware over to it.
+static void enterStation() {
+    WiFi.setAutoReconnect(true);   // runtime drops: let the core handle the common cases
+    g_sta = true;
+    g_ap  = false;
+    g_staDownSince = 0;
+    if (MDNS.begin(MDNS_HOST)) MDNS.addService("http", "tcp", 80);
+    Serial.printf("[wifi] connected to %s  RSSI %d dBm  IP %s\n",
+                  g_ssid.c_str(), WiFi.RSSI(), WiFi.localIP().toString().c_str());
+}
+
+// Boot connect: retry the saved network until the time budget runs out. Blocks
+// setup(); the display task shows the attempt count meanwhile.
+static bool connectStation() {
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);            // lower request latency, snappier web UI
+    WiFi.setAutoReconnect(false);    // the retries below are ours, not the core's
+    // Join the strongest AP carrying the SSID (mesh / repeaters), not the first
+    // one a fast scan happens to hear.
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+
+    g_connecting = true;
+    const uint32_t t0 = millis();
+    uint8_t attempt = 0;
+
+    while (millis() - t0 < WIFI_STA_TIMEOUT_MS) {
+        g_attempt  = ++attempt;
+        g_failReason = 0;
+        const uint32_t seq = g_failSeq;
+        const uint32_t ta  = millis();
+        WiFi.begin(g_ssid.c_str(), g_pass.c_str());
+        WiFi.setTxPower(WIFI_STA_TX_POWER);   // after begin(); see Config.h note
+
+        for (;;) {
+            const uint32_t now = millis();
+            g_progress = (uint8_t)min<uint32_t>(100, (now - t0) * 100 / WIFI_STA_TIMEOUT_MS);
+            if (WiFi.status() == WL_CONNECTED) {
+                g_connecting = false;
+                return true;
+            }
+            if (g_failSeq != seq) break;                                  // driver gave up
+            if (!g_linkUp && now - ta >= WIFI_STA_ATTEMPT_MS) break;      // stuck before associating
+            if (now - t0 >= WIFI_STA_TIMEOUT_MS + (g_linkUp ? WIFI_STA_DHCP_GRACE_MS : 0)) break;
+            delay(100);
+        }
+
+        Serial.printf("[wifi] attempt %u failed: %s\n", attempt, failText());
+        WiFi.disconnect(false);
+        delay(WIFI_STA_RETRY_GAP_MS);
+    }
+
+    g_connecting = false;
+    return false;
 }
 
 void Wifi_begin() {
     LittleFS.begin(true);   // format on first boot
     WiFi.persistent(false);
+    WiFi.onEvent(onWifiEvent);
 
-    String ssid, pass;
-    if (loadCreds(ssid, pass)) {
-        WiFi.mode(WIFI_STA);
-        WiFi.setSleep(false);   // lower request latency, snappier web UI
-        WiFi.begin(ssid.c_str(), pass.c_str());
-        WiFi.setTxPower(WIFI_TX_POWER);   // after begin(); see Config.h note
-
-        uint32_t start = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_STA_TIMEOUT_MS) {
-            delay(200);
-            yield();
-        }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            g_sta = true;
-            g_ap  = false;
-            if (MDNS.begin(MDNS_HOST)) MDNS.addService("http", "tcp", 80);
+    if (loadCreds(g_ssid, g_pass)) {
+        if (connectStation()) {
+            enterStation();
             return;
         }
-
-        // Timed out -> drop the failed STA attempt and fall back to AP.
+        // Budget used up -> drop the failed STA attempt and fall back to AP.
+        Serial.println("[wifi] saved network unreachable, starting AP");
         WiFi.disconnect(true);
     }
 
     startAP();
+}
+
+// STA mode: the core does not reconnect after every kind of drop (AUTH_FAIL,
+// for one). If the link stays down, kick a new attempt ourselves.
+static void staWatchdog() {
+    const uint32_t now = millis();
+    if (WiFi.status() == WL_CONNECTED) {
+        if (g_staDownSince) Serial.printf("[wifi] link back  RSSI %d dBm\n", WiFi.RSSI());
+        g_staDownSince = 0;
+        return;
+    }
+    if (!g_staDownSince) {
+        g_staDownSince = now;
+        Serial.printf("[wifi] link lost: %s\n", failText());
+        return;
+    }
+    if (now - g_staDownSince < WIFI_STA_WATCHDOG_MS) return;
+    Serial.printf("[wifi] link still down (%s), reconnecting\n", failText());
+    WiFi.disconnect(false);
+    WiFi.begin(g_ssid.c_str(), g_pass.c_str());
+    g_staDownSince = now;   // give this attempt a full period before the next one
+}
+
+// AP fallback: quietly retry the saved network while nobody uses the AP.
+static void apRetry() {
+    if (g_ssid.length() == 0 || g_scanBusy) return;
+    const uint32_t now = millis();
+    const bool clients = WiFi.softAPgetStationNum() > 0;
+
+    if (g_apTryAt) {                                   // a try is in flight
+        if (WiFi.status() == WL_CONNECTED) {
+            // Home network is back: leave AP mode for good.
+            dnsServer.stop();
+            WiFi.softAPdisconnect(true);               // drops to plain STA mode
+            WiFi.setSleep(false);
+            WiFi.setTxPower(WIFI_STA_TX_POWER);
+            g_apTryAt = 0;
+            enterStation();
+            return;
+        }
+        const bool failed = g_failSeq != g_apTrySeq;
+        if (clients || failed || now - g_apTryAt >= WIFI_AP_RETRY_ATTEMPT_MS) {
+            // Back to a passive STA so the AP keeps its channel for its clients.
+            WiFi.disconnect(false);
+            Serial.printf("[wifi] AP-mode retry %s\n", clients ? "aborted, client joined" : failText());
+            g_apTryAt     = 0;
+            g_apIdleSince = now;
+        }
+        return;
+    }
+
+    if (clients) { g_apIdleSince = now; return; }
+    if (now - g_apIdleSince < WIFI_AP_RETRY_PERIOD_MS) return;
+
+    Serial.printf("[wifi] AP idle, retrying %s\n", g_ssid.c_str());
+    g_failReason = 0;
+    g_apTrySeq   = g_failSeq;
+    g_apTryAt    = now ? now : 1;
+    WiFi.begin(g_ssid.c_str(), g_pass.c_str());
 }
 
 // ---------- Async network scan ----------
@@ -212,8 +352,16 @@ bool   Wifi_apActive()  { return g_ap; }
 String Wifi_ip()        { return g_sta ? WiFi.localIP().toString() : WiFi.softAPIP().toString(); }
 String Wifi_ssid()      { return g_sta ? WiFi.SSID() : String(AP_SSID); }
 
+bool    Wifi_connecting() { return g_connecting; }
+uint8_t Wifi_attempt()    { return g_attempt; }
+uint8_t Wifi_progress()   { return g_progress; }
+
 void Wifi_loop() {
-    if (g_ap)       dnsServer.processNextRequest();
+    if (g_ap) {
+        for (int i = 0; i < WIFI_DNS_BURST; i++) dnsServer.processNextRequest();
+        apRetry();
+    }
+    if (g_sta)      staWatchdog();
     if (g_scanBusy) scanStep();
     // ESP32 mDNS runs in its own task; no update() call needed.
 }

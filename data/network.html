@@ -221,7 +221,8 @@ $('#connect').addEventListener('click', async () => {
   if(!ssid){ $('#msg').className='msg bad'; $('#msg').textContent='Pick or type a network first.'; return; }
   $('#connect').disabled = true;
   $('#msg').className='msg ok';
-  $('#msg').textContent = 'Saved. Restarting to connect to "' + ssid + '"… Rejoin your home Wi-Fi, then open http://camera-slider.local';
+  $('#msg').textContent = 'Saved. Restarting to connect to "' + ssid + '"… The slider screen counts the attempts; once it shows an IP address, '
+    + 'rejoin your home Wi-Fi and open http://camera-slider.local. If it shows AP MODE again, the password was probably wrong.';
   await api('/api/wifi', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({ssid, pass})

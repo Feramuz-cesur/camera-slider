@@ -150,6 +150,8 @@
     border:1px solid var(--line);background:#1d2230;color:var(--text);
     font:inherit;font-weight:600;cursor:pointer;touch-action:manipulation}
   .setbar button:active{background:var(--accent2)}
+  /* start/end never captured: the app shows a warning until it is */
+  .setbar button.need{border-color:var(--warn);color:var(--warn)}
   /* the "drive there" row reads quieter than the "store this pose" row */
   .setrow.go button{background:#141821;font-weight:500;color:var(--muted)}
   .setrow.go button:active{background:var(--accent2);color:var(--text)}
@@ -654,14 +656,19 @@ $('#goEnd').addEventListener('click',   () => goPose('end'));
 
 // ---- Use current pose as start / end (fixed bottom bar) ----
 // Captures the live position of BOTH axes and pushes it to the ESP32.
+// The firmware remembers that a pose was captured (the app warns until both
+// are); the next save carries the flag and clears it once it went through.
+const rangeMark = { start:false, end:false };
 $('#useStart').addEventListener('click', () => {
   cfg.sStart = clamp(Math.round(curMm), 0, cfg.maxTravelMm);
   cfg.pStart = clamp(Math.round(curPan), 0, cfg.panMaxDeg);
+  rangeMark.start = true;
   renderLin(); renderPan(); scheduleSave();
 });
 $('#useEnd').addEventListener('click', () => {
   cfg.sEnd = clamp(Math.round(curMm), 0, cfg.maxTravelMm);
   cfg.pEnd = clamp(Math.round(curPan), 0, cfg.panMaxDeg);
+  rangeMark.end = true;
   renderLin(); renderPan(); scheduleSave();
 });
 
@@ -733,6 +740,10 @@ function applyStatus(s) {
   sb.classList.toggle('busy', s.stateRaw !== 'IDLE' && s.stateRaw !== 'BOOT');
 
   renderHoming(s);
+
+  // Point at the pose button(s) still to press. Older firmware sends no flags.
+  $('#useStart').classList.toggle('need', s.startSet === false);
+  $('#useEnd').classList.toggle('need',   s.endSet   === false);
 
   // Stepper enable/disable toggle reflects the current hold state.
   const mb = $('#motorsBtn');
@@ -953,10 +964,16 @@ async function saveSettings(){
     panAccelDegS2:  numVal('#setPanAccel'),
     panJogSpeedDegS:numVal('#setPanJogSpeed'),
     panInvertDir:   $('#setPanInvertDir').checked,
-    panStartDeg:    cfg.pStart, panEndDeg: cfg.pEnd
+    panStartDeg:    cfg.pStart, panEndDeg: cfg.pEnd,
+    startSet:       rangeMark.start || undefined,
+    endSet:         rangeMark.end   || undefined
   };
   Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
   const r = await post('/api/settings', payload);
+  if (r) {
+    if (payload.startSet) rangeMark.start = false;
+    if (payload.endSet)   rangeMark.end   = false;
+  }
   const msg = $('#saveMsg');
   msg.textContent = r ? 'Saved ✓' : 'Save failed — check values';
   msg.style.color = r ? 'var(--ok)' : 'var(--bad)';

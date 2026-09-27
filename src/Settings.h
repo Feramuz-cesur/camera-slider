@@ -35,3 +35,10 @@ void   Settings_begin();
 void   Settings_loadDefaults();
 bool   Settings_load();
 void   Settings_save();
+
+// Whether the user has captured a start / end pose ("Use as Start/End" in the
+// web UI). Until then the stored range is just the factory default, so the app
+// can warn instead of timelapsing along a range nobody chose.
+bool   Settings_startSet();
+bool   Settings_endSet();
+void   Settings_markRange(bool start, bool end);
