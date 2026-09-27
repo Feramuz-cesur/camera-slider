@@ -15,7 +15,8 @@ tarayıcısından çalışan web arayüzüyle yapılır — uygulama kurmak gere
   iki eksen ortak saat üzerinden senkron çalışır
 - **Homing:** limit switch ile lineer eksen sıfırlama (hızlı yaklaş → geri çekil → yavaş tekrar yaklaş)
 - **Jog:** web arayüzünden elle sürme, hız ayarlanabilir
-- **OLED:** kart üzerindeki 0.42" ekranda IP adresi ve durum bilgisi
+- **OLED:** kart üzerindeki 0.42" ekranda IP adresi; açılışta Wi-Fi deneme sayacı,
+  hotspot modunda ağ adı ve şifre
 - Adım üretimi [FastAccelStepper](https://github.com/gin66/FastAccelStepper) ile donanım destekli
 
 ## İlk kullanım
@@ -140,6 +141,76 @@ pio run -t uploadfs        # web arayüzü (data/ → LittleFS)
 
 İkisini de yükledikten sonra cihaz açılışta hotspot'unu açar — devamı için
 [İlk kullanım](#ilk-kullanım) bölümüne bakın.
+
+## Sorun giderme
+
+### Slider beklendiği gibi çalışmıyorsa: önce Wi-Fi mesafesine bakın
+
+Uygulamada sık sık **"Bağlı değil"** görmek, komutların gecikmesi, kareler arasında
+slider'ın hareket etmemesi ya da açılışta ev ağına bağlanamayıp hotspot moduna
+düşmesi gibi sorunların büyük çoğunluğunun sebebi **slider'ın modemden uzakta
+olmasıdır.**
+
+ESP32-C3 SuperMini kartı, kartın üzerine lehimli küçük bir **SMD (seramik) anten**
+kullanır. Harici anten konnektörlü ya da daha büyük PCB antenli ESP32 modellerine
+göre hem yayın hem de alış gücü belirgin şekilde düşüktür. Telefonunuzun aynı
+noktada rahatça bağlandığı bir ağ, slider için sınırda olabilir.
+
+Yapabilecekleriniz (etkisi büyükten küçüğe):
+
+- **Slider'ı modeme yaklaştırın** ya da aradaki duvar sayısını azaltın. Mümkünse
+  modemle aynı odada kullanın; olmuyorsa araya bir Wi-Fi genişletici / mesh noktası koyun.
+- **Antenin etrafını boş bırakın.** Antenin 1–1,5 cm çevresinde metal olmasın:
+  alüminyum profil, motor kabloları ve kablo demeti anteni "söndürür" (20 dB kayıp
+  sıradandır). Kutu içinde antenin metal parçalara değil, plastik duvara bakmasını sağlayın.
+- **Motor kablolarını** ikişerli burgu yapın ve antenden uzak geçirin.
+- **Beslemeyi güçlendirin.** Wi-Fi yayını sırasında kart anlık olarak yüksek akım
+  çeker; 3,3 V hattı çökerse sinyal bozulur. ESP kartının hemen yanına
+  470–1000 µF + 100 nF kondansatör koyun, her A4988'in VMOT girişine yakın 100 µF
+  ekleyin ve motor topraklamasının ESP'nin toprağı üzerinden dönmemesine dikkat edin.
+
+**Sinyal gücünü ölçmek için** kartı USB ile bilgisayara bağlayıp seri monitörü açın
+(`pio device monitor`, 115200 baud). Kart ağa bağlandığında şöyle bir satır yazar:
+
+```
+[wifi] connected to EvAgim  RSSI -58 dBm  IP 192.168.1.110
+```
+
+| RSSI | Anlamı |
+|---|---|
+| -30 … -60 dBm | İyi |
+| -60 … -70 dBm | Kullanılabilir, ara sıra kopma olabilir |
+| -70 dBm'den kötü | Zayıf — kopmalar ve açılışta bağlanamama beklenir |
+
+Zayıf sinyalde seri monitörde `[wifi] attempt 2 failed: AUTH_FAIL` ya da
+`[wifi] link lost` satırları da görülür. Şifre doğru olsa bile ESP32 zayıf
+sinyalde `AUTH_FAIL` bildirebilir.
+
+### Açılışta ev ağına bağlanamıyor
+
+- Açılışta OLED'de **"Connecting"** ve altında büyük bir **deneme sayısı** görünür.
+  Kart, kayıtlı ağa yaklaşık 22 saniye boyunca tekrar tekrar bağlanmayı dener.
+- Bağlanamazsa hotspot moduna geçer ve OLED'de **"AP MODE"**, ağ adı (`CameraSlider`)
+  ve şifre (`12345678`) yazar.
+- Hotspot'a kimse bağlı değilken kart, dakikada bir ev ağını sessizce tekrar dener.
+  Modem geç açıldıysa ya da ilk deneme şanssız geçtiyse **reset'e basmadan**
+  kendiliğinden bağlanır.
+- Her seferinde "AP MODE"a düşüyorsa ya şifre yanlıştır (hotspot'a bağlanıp tekrar
+  girin) ya da sinyal zayıftır (yukarıdaki bölüm).
+
+### Kurulum sayfası kendiliğinden açılmıyor
+
+- Tarayıcıya elle **`http://192.168.4.1`** yazın (başındaki `http://` önemli).
+- Bazı telefonlar, internet erişimi olmayan bu ağı "internet yok" diye bırakıp mobil
+  veriye döner. Telefonun sorduğu "bu ağda kal / bağlı kal" seçeneğini onaylayın ya
+  da kurulum süresince mobil veriyi kapatın.
+
+### Uygulamada "Başlangıç ve bitiş ayarlanmamış" yazıyor
+
+Slider'a hiç başlangıç/bitiş noktası kaydedilmemiş demektir. Web arayüzünde
+slider'ı istediğiniz konuma sürüp **Use as Start** ve **Use as End** butonlarına
+basın. Kaydedilmemiş olan buton turuncu görünür. Firmware güncellemesinden önce
+açılmış bir tarayıcı sekmesi kullanıyorsanız önce sayfayı yenileyin.
 
 ## Proje yapısı
 
