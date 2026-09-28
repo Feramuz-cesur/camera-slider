@@ -35,10 +35,12 @@ tarayıcısından çalışan web arayüzüyle yapılır — uygulama kurmak gere
 
 ## PrintLapse ile 3D Yazıcı Timelapse Videoları Oluşturma
 
-Slider, **PrintLapse** Android uygulamasıyla birlikte 3D baskıların timelapse
-videosunu çekmek için kullanılabilir. Her katmanda bir fotoğraf çekilir ve
-kamera, baskı boyunca başlangıç noktasından bitiş noktasına doğru yavaşça
-ilerleyerek videoya hareket katar.
+Slider, **[PrintLapse](https://play.google.com/store/apps/details?id=com.printlapse)**
+Android uygulamasıyla birlikte 3D baskıların timelapse videosunu çekmek için
+kullanılabilir. Her katmanda bir fotoğraf çekilir ve kamera, baskı boyunca
+başlangıç noktasından bitiş noktasına doğru yavaşça ilerleyerek videoya hareket katar.
+
+📱 **Uygulamayı indirin:** [PrintLapse — Google Play](https://play.google.com/store/apps/details?id=com.printlapse)
 
 PrintLapse ile kullanımda akış görseldeki gibidir:
 
