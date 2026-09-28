@@ -5,6 +5,7 @@ Camera Slider'ın basılması gereken parçalarının STL dosyaları.
 ```
 3d-models/
 ├── slider/           Projeye özel parçalar (kendi tasarımım)
+├── shutter/          PrintLapse için switch kutusu (top + bottom)
 └── telefon-tutucu/   HeyVye'nin Modular Mounting System parçaları (bkz. aşağıdaki not)
 ```
 

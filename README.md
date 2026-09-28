@@ -33,9 +33,131 @@ tarayıcısından çalışan web arayüzüyle yapılır — uygulama kurmak gere
 
 <img width="1462" height="2135" alt="Arayüz" src="https://github.com/user-attachments/assets/22bc36cf-856d-4590-90e5-947790ff498f" />
 
-## PrintLapse ile kullanım
+## PrintLapse ile 3D Yazıcı Timelapse Videoları Oluşturma
 
- DÜZENLENECEK !!
+Slider, **PrintLapse** Android uygulamasıyla birlikte 3D baskıların timelapse
+videosunu çekmek için kullanılabilir. Her katmanda bir fotoğraf çekilir ve
+kamera, baskı boyunca başlangıç noktasından bitiş noktasına doğru yavaşça
+ilerleyerek videoya hareket katar.
+
+PrintLapse ile kullanımda akış görseldeki gibidir:
+
+![PrintLapse ile kullanım akışı: 3D yazıcı, telefon ve Camera Slider](docs/printlapse-akis.png)
+
+1. **Yazıcı → telefon:** Yazıcı her katman değişiminde telefona bir tetik gönderir.
+2. **Telefon:** PrintLapse tetiği alır ve bir fotoğraf çeker.
+3. **Telefon → slider:** Fotoğraf çekildikten sonra PrintLapse, Wi-Fi üzerinden
+   slider'a bir sonraki katman numarasını gönderir. Slider her iki ekseni o katmana
+   karşılık gelen konuma götürür. Fotoğraf çekilirken slider hareket etmez.
+
+Konumlar başlangıç ve bitiş arasında eşit aralıklarla dağıtılır: ilk katman
+başlangıç noktasına, son katman bitiş noktasına denk gelir.
+
+### Tetikleyici seçenekleri
+
+Her katman değişiminde yazıcı kafayı sabit bir park noktasına götürür ve
+fotoğrafı iki yoldan biriyle tetikler:
+
+| Tetikleyici | Nasıl çalışır |
+|---|---|
+| **Wi-Fi** | Yazıcı telefona `http://<telefonun-IP-adresi>:5000/foto-cek` isteği gönderir. Uygulamada **Ayarlar → Ağ Tetikleyici** açık olmalıdır. |
+| **Switch (deklanşör)** | Kafa, park noktasından biraz daha sağa giderek yazıcıya sabitlenmiş bir switch'e dokunur. Switch'in uçlarına bir **Bluetooth deklanşörün** ya da **kablolu kulaklığın ses tuşunun** kontakları lehimlenir; telefon bunu ses tuşuna basılmış gibi algılar. Ağ bağlantısı gerektirmez. Switch kutusunun baskı dosyaları [`3d-models/shutter/`](3d-models/shutter/) klasöründedir. |
+
+### Klipper makrosu
+
+Aşağıdaki makrolar `printer.cfg` dosyasına eklenir. Wi-Fi ile tetikleme için
+Klipper'da **G-Code Shell Command** eklentisi kurulu olmalıdır
+([KIAUH](https://github.com/dw-0/kiauh) → Extensions menüsünden kurulabilir).
+
+```ini
+[gcode_macro TIMELAPSE_ON]
+description: Timelapse aktif
+gcode:
+  SET_GCODE_VARIABLE MACRO=TIMELAPSE VARIABLE=enabled VALUE=1
+  M117 Timelapse ACIK
+
+[gcode_macro TIMELAPSE_OFF]
+description: Timelapse kapat
+gcode:
+  SET_GCODE_VARIABLE MACRO=TIMELAPSE VARIABLE=enabled VALUE=0
+  M117 Timelapse KAPALI
+
+[gcode_macro TIMELAPSE]
+variable_enabled: 0
+gcode:
+  {% if enabled == 1 %}
+    {% set retract = params.E | default(1.5) | float %}
+    {% set z_hop = params.Z | default(1) | float %}
+    {% set park_x = params.X | default(239) | float %}
+    {% set park_y = params.Y | default(240) | float %}
+
+    G91
+    G1 E-{retract} F2100            ; filamenti geri çek
+    G1 Z{z_hop} F600                ; nozzle'ı baskıdan kaldır
+    G90
+    G1 X{park_x} Y{park_y} F7000    ; park noktasına git
+    M400
+    G4 P300                         ; titreşim dinsin
+    RUN_SHELL_COMMAND CMD=tetikle_kamera
+    G4 P1500                        ; fotoğraf çekilsin
+    G91
+    G1 Z-{z_hop} F600
+    M83
+    G1 E{retract} F2100
+    G90
+  {% endif %}
+
+[gcode_shell_command tetikle_kamera]
+command: curl http://<TELEFONUN_IP_ADRESI>:5000/foto-cek
+timeout: 6.
+verbose: False
+```
+
+**Switch ile tetiklemek için** makrodaki `RUN_SHELL_COMMAND CMD=tetikle_kamera`
+satırının yerine kafayı switch'e götürüp geri çeken hareketi yazın. Mesafe,
+switch'in nereye takıldığına göre yazıcıdan yazıcıya değişir:
+
+```ini
+    G1 X{park_x + 8} F3000          ; switch'e dokun (mesafeyi yazıcınıza göre ayarlayın)
+    G4 P200
+    G1 X{park_x} F3000              ; geri çekil
+```
+
+Kullanmadan önce:
+
+- Dilimleyicinizde (slicer) her katman değişiminde çalışan G-code alanına `TIMELAPSE`
+  satırını ekleyin. OrcaSlicer'da bu alan **Printer settings → Machine G-code →
+  Timelapse G-code** altındadır:
+
+  ![OrcaSlicer'da Timelapse G-code alanına TIMELAPSE yazılması](docs/orca-timelapse-gcode.png)
+
+- Makro varsayılan olarak kapalıdır: baskıdan önce `TIMELAPSE_ON` çalıştırın
+  (ya da `PRINT_START` makronuza ekleyin).
+- Park noktasını yazıcınıza göre değiştirebilirsiniz: `TIMELAPSE X=230 Y=230`.
+
+### PrintLapse kullanımı
+
+1. **Slider'ı hazırlayın.** Web arayüzünde sıfırlama (homing) adımlarını tamamlayın,
+   slider'ı istediğiniz konumlara sürüp **Use as Start** ve **Use as End**
+   butonlarıyla başlangıç ve bitiş noktalarını kaydedin.
+2. **Slider'ın adresini girin.** PrintLapse'te **Ayarlar → Kızak IP Adresi** alanına
+   slider'ın OLED ekranında yazan IP adresini yazın ve **Bağlantıyı Test Et**'e basın.
+   Telefon ve slider aynı Wi-Fi ağında olmalıdır.
+3. **Tetikleyiciyi hazırlayın.** Yazıcıya [Klipper makrosunu](#klipper-makrosu)
+   ekleyin. Wi-Fi ile tetikleyecekseniz uygulamada **Ayarlar → Ağ Tetikleyici**
+   seçeneğini açın.
+4. **Projeyi oluşturun.** Yeni bir proje açın, **Kamera kızağını kullan** seçeneğini
+   açın ve **Toplam Katman** alanına dilimleyicide (slicer) görünen katman sayısını
+   yazın. Ardından **Kamerayı Başlat**'a basın.
+5. **Kontrol edin.** Kamera ekranının üstündeki **KIZAK** kartında bağlantı durumu,
+   slider'ın konumu ve çekilen kare sayısı görünür. **Başa Git** slider'ı başlangıç
+   noktasına götürür; **Önizleme** ise başlangıçtan bitişe bir deneme turu attırır.
+   Kartta turuncu bir uyarı varsa (ör. "Sıfırlama gerekli", "Başlangıç ve bitiş
+   ayarlanmamış") önce onu giderin.
+6. **Baskıyı başlatın.** Her tetikte bir kare çekilir ve slider bir sonraki konuma
+   geçer. Toplam katman sayısına ulaşıldığında uygulama sizi bilgilendirir.
+
+Bağlantı sorunları yaşarsanız [Sorun giderme](#sorun-giderme) bölümüne bakın.
 
 ## Donanım
 
@@ -109,6 +231,7 @@ klasöründe:
 ```
 3d-models/
 ├── slider/           Projeye özel parçalar (motor yatakları, araba, kayış tutucu vb.)
+├── shutter/          Yazıcı kafasının bastığı switch kutusu (PrintLapse tetikleyicisi)
 └── telefon-tutucu/   Telefon tutucu modülleri (harici tasarım — aşağıya bakın)
 ```
 
