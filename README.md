@@ -65,6 +65,16 @@ fotoğrafı iki yoldan biriyle tetikler:
 | **Wi-Fi** | Yazıcı telefona `http://<telefonun-IP-adresi>:5000/foto-cek` isteği gönderir. Uygulamada **Ayarlar → Ağ Tetikleyici** açık olmalıdır. |
 | **Switch (deklanşör)** | Kafa, park noktasından biraz daha sağa giderek yazıcıya sabitlenmiş bir switch'e dokunur. Switch'in uçlarına bir **Bluetooth deklanşörün** ya da **kablolu kulaklığın ses tuşunun** kontakları lehimlenir; telefon bunu ses tuşuna basılmış gibi algılar. Ağ bağlantısı gerektirmez. Switch kutusunun baskı dosyaları [`3d-models/shutter/`](3d-models/shutter/) klasöründedir. |
 
+Switch kutusunun yazıcıya takılmış hâlini ve içindeki bağlantıları gösteren
+fotoğraflar da aynı klasördedir:
+[üstten](3d-models/shutter/kurulum-ustten.jpg) ·
+[yandan](3d-models/shutter/kurulum-yandan.jpg) ·
+[parçalar ve kablolama](3d-models/shutter/parcalar.jpg).
+
+> **Not:** Switch kutusu **Artillery Sidewinder X4 Pro** için tasarlandı; başka
+> yazıcılara oturmayabilir. Kendi yazıcınız için internette benzer bir
+> switch/deklanşör tutucusu aratabilirsiniz.
+
 ### Klipper makrosu
 
 Aşağıdaki makrolar `printer.cfg` dosyasına eklenir. Wi-Fi ile tetikleme için
