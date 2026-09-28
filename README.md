@@ -216,7 +216,7 @@ Yüksek çözünürlüklü PDF: [docs/baglanti-semasi.pdf](docs/baglanti-semasi.
 
 ## Montaj bilgileri
 
-https://github.com/user-attachments/assets/d8921941-d690-4528-93d0-fbbbbc627310
+![Slider montajı: parçaların patlatılmış görünümü](docs/slider-montaj.gif)
 
 <img width="1466" height="2074" alt="png 1" src="https://github.com/user-attachments/assets/6fcbd022-65e0-4f87-8ea6-d9b08254046a" />
 
