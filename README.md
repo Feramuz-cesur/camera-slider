@@ -1,5 +1,7 @@
 # Camera Slider
 
+![Camera Slider: telefonla çekim yaparken](docs/slider-kapak.jpg)
+
 ESP32-C3 tabanlı, WiFi üzerinden kontrol edilen 2 eksenli motorlu kamera slider'ı.
 Lineer eksen kamerayı GT2 kayışlı bir ray üzerinde taşır, rotary (pan) eksen ise
 ray üzerindeki platformu 360° döndürür. Tüm kontrol telefon/bilgisayar
