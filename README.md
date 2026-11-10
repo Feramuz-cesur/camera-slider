@@ -1,100 +1,104 @@
 # Camera Slider
 
-![Camera Slider: telefonla çekim yaparken](docs/slider-kapak.jpg)
+**English** | [Türkçe](README.tr.md)
 
-ESP32-C3 tabanlı, WiFi üzerinden kontrol edilen 2 eksenli motorlu kamera slider'ı.
-Lineer eksen kamerayı GT2 kayışlı bir ray üzerinde taşır, rotary (pan) eksen ise
-ray üzerindeki platformu 360° döndürür. Tüm kontrol telefon/bilgisayar
-tarayıcısından çalışan web arayüzüyle yapılır — uygulama kurmak gerekmez.
+![Camera Slider: filming with a phone](docs/slider-kapak.jpg)
 
-## Özellikler
+A 2-axis motorized camera slider based on the ESP32-C3, controlled over Wi-Fi.
+The linear axis carries the camera along a GT2 belt-driven rail, while the rotary
+(pan) axis turns the platform on the rail through 360°. Everything is controlled
+from a web interface that runs in your phone or computer browser — no app to install.
 
-- **2 eksen:** lineer slider (NEMA 17 + GT2 kayış) ve 360° pan platformu (NEMA 17 direkt tahrik)
-- **Web arayüzü:** cihaz üzerindeki LittleFS'ten sunulur; canlı durum ve kontrol WebSocket üzerinden
-- **WiFi:** ev ağına bağlanır (`camera-slider.local`), bağlanamazsa kendi hotspot'unu açar
-  (SSID `CameraSlider`, captive portal ile kurulum sayfası otomatik açılır)
-- **Otomatik hareket:** başlangıç/bitiş noktaları arasında ayarlanabilir hızda gidiş-geliş,
-  iki eksen ortak saat üzerinden senkron çalışır
-- **Homing:** limit switch ile lineer eksen sıfırlama (hızlı yaklaş → geri çekil → yavaş tekrar yaklaş)
-- **Jog:** web arayüzünden elle sürme, hız ayarlanabilir
-- **OLED:** kart üzerindeki 0.42" ekranda IP adresi; açılışta Wi-Fi deneme sayacı,
-  hotspot modunda ağ adı ve şifre
-- Adım üretimi [FastAccelStepper](https://github.com/gin66/FastAccelStepper) ile donanım destekli
+## Features
 
-## İlk kullanım
+- **2 axes:** linear slider (NEMA 17 + GT2 belt) and a 360° pan platform (NEMA 17, direct drive)
+- **Web interface:** served from LittleFS on the device; live status and control over WebSocket
+- **Wi-Fi:** joins your home network (`camera-slider.local`); if it can't, it opens its own hotspot
+  (SSID `CameraSlider`, the setup page opens automatically via a captive portal)
+- **Automatic motion:** back-and-forth travel between start/end points at an adjustable speed,
+  with both axes running in sync on a shared clock
+- **Homing:** linear axis homing with a limit switch (fast approach → back off → slow re-approach)
+- **Jog:** drive the slider by hand from the web interface, with adjustable speed
+- **OLED:** the board's 0.42" display shows the IP address; on boot, a Wi-Fi attempt counter;
+  in hotspot mode, the network name and password
+- Hardware-assisted step generation with [FastAccelStepper](https://github.com/gin66/FastAccelStepper)
 
-1. Cihaza güç verin. Kayıtlı bir ağ yoksa **`CameraSlider`** isimli hotspot'u açar
-   (şifre `12345678`).
-2. Telefonunuzla bu ağa bağlanın. Kurulum sayfası kendiliğinden açılır; açılmazsa
-   tarayıcıya elle **`http://192.168.4.1`** yazın (başındaki `http://` önemli).
-3. Listeden ev ağınızı seçip şifresini girin. Cihaz yeniden bağlanır.
-4. Bundan sonra kontrol arayüzüne **`http://camera-slider.local`** adresinden
-   ulaşırsınız — IP adresi kart üzerindeki OLED ekranda da yazar.
+## First use
 
-## Arayüz
+1. Power the device. If no network is saved, it opens a hotspot named **`CameraSlider`**
+   (password `12345678`).
+2. Connect your phone to this network. The setup page opens on its own; if it doesn't,
+   type **`http://192.168.4.1`** into your browser (the leading `http://` matters).
+3. Pick your home network from the list and enter its password. The device reconnects.
+4. From then on, the control interface is at **`http://camera-slider.local`** —
+   the IP address is also shown on the board's OLED display.
 
-<img width="1462" height="2135" alt="Arayüz" src="https://github.com/user-attachments/assets/22bc36cf-856d-4590-90e5-947790ff498f" />
+## Interface
 
-## PrintLapse ile 3D Yazıcı Timelapse Videoları Oluşturma
+<img width="1462" height="2135" alt="Web interface" src="https://github.com/user-attachments/assets/22bc36cf-856d-4590-90e5-947790ff498f" />
 
-Slider, **[PrintLapse](https://play.google.com/store/apps/details?id=com.printlapse)**
-Android uygulamasıyla birlikte 3D baskıların timelapse videosunu çekmek için
-kullanılabilir. Her katmanda bir fotoğraf çekilir ve kamera, baskı boyunca
-başlangıç noktasından bitiş noktasına doğru yavaşça ilerleyerek videoya hareket katar.
+## Making 3D Printer Timelapse Videos with PrintLapse
 
-📱 **Uygulamayı indirin:** [PrintLapse — Google Play](https://play.google.com/store/apps/details?id=com.printlapse)
+The slider can be used together with the
+**[PrintLapse](https://play.google.com/store/apps/details?id=com.printlapse)**
+Android app to shoot timelapse videos of 3D prints. One photo is taken per layer,
+and the camera slowly travels from the start point to the end point over the course
+of the print, adding motion to the video.
 
-PrintLapse ile kullanımda akış görseldeki gibidir:
+📱 **Get the app:** [PrintLapse — Google Play](https://play.google.com/store/apps/details?id=com.printlapse)
 
-![PrintLapse ile kullanım akışı: 3D yazıcı, telefon ve Camera Slider](docs/printlapse-akis.png)
+When used with PrintLapse, the flow is as shown in the diagram:
 
-1. **Yazıcı → telefon:** Yazıcı her katman değişiminde telefona bir tetik gönderir.
-2. **Telefon:** PrintLapse tetiği alır ve bir fotoğraf çeker.
-3. **Telefon → slider:** Fotoğraf çekildikten sonra PrintLapse, Wi-Fi üzerinden
-   slider'a bir sonraki katman numarasını gönderir. Slider her iki ekseni o katmana
-   karşılık gelen konuma götürür. Fotoğraf çekilirken slider hareket etmez.
+![Workflow with PrintLapse: 3D printer, phone and Camera Slider](docs/printlapse-akis.png)
 
-Konumlar başlangıç ve bitiş arasında eşit aralıklarla dağıtılır: ilk katman
-başlangıç noktasına, son katman bitiş noktasına denk gelir.
+1. **Printer → phone:** On every layer change, the printer sends a trigger to the phone.
+2. **Phone:** PrintLapse receives the trigger and takes a photo.
+3. **Phone → slider:** After the photo is taken, PrintLapse sends the next layer number
+   to the slider over Wi-Fi. The slider moves both axes to the position for that layer.
+   The slider does not move while a photo is being taken.
 
-### Tetikleyici seçenekleri
+Positions are spread evenly between start and end: the first layer lands on the
+start point and the last layer on the end point.
 
-Her katman değişiminde yazıcı kafayı sabit bir park noktasına götürür ve
-fotoğrafı iki yoldan biriyle tetikler:
+### Trigger options
 
-| Tetikleyici | Nasıl çalışır |
+On every layer change, the printer moves the head to a fixed park position and
+triggers the photo in one of three ways:
+
+| Trigger | How it works |
 |---|---|
-| **Wi-Fi** | Yazıcı telefona `http://<telefonun-IP-adresi>:5000/foto-cek` isteği gönderir. Uygulamada **Ayarlar → Ağ Tetikleyici** açık olmalıdır. |
-| **Switch (deklanşör)** | Kafa, park noktasından biraz daha sağa giderek yazıcıya sabitlenmiş bir switch'e dokunur. Switch'in uçlarına bir **Bluetooth deklanşörün** ya da **kablolu kulaklığın ses tuşunun** kontakları lehimlenir; telefon bunu ses tuşuna basılmış gibi algılar. Ağ bağlantısı gerektirmez. Switch kutusunun baskı dosyaları [`3d-models/shutter/`](3d-models/shutter/) klasöründedir. |
+| **Wi-Fi** | The printer sends a `http://<phone-IP-address>:5000/foto-cek` request to the phone. **Settings → Network Trigger** must be enabled in the app. |
+| **Switch (shutter)** | The head moves a little further right past the park position and presses a switch mounted on the printer. The contacts of a **Bluetooth shutter remote** or the **volume button of a wired headset** are soldered to the switch terminals; the phone sees it as a volume button press. No network connection needed. The print files for the switch box are in the [`3d-models/shutter/`](3d-models/shutter/) folder. |
+| **Visual trigger** | PrintLapse uses image processing on the camera feed to track the printer's head or another moving part. You mark an area on the image; when the tracked part enters that area, a photo is taken. No network connection or extra hardware needed. |
 
-Switch kutusunun yazıcıya takılmış hâlini ve içindeki bağlantıları gösteren
-fotoğraflar da aynı klasördedir:
-[üstten](3d-models/shutter/kurulum-ustten.jpg) ·
-[yandan](3d-models/shutter/kurulum-yandan.jpg) ·
-[parçalar ve kablolama](3d-models/shutter/parcalar.jpg).
+Photos of the switch box mounted on the printer and of its wiring are in the
+same folder:
+[top](3d-models/shutter/kurulum-ustten.jpg) ·
+[side](3d-models/shutter/kurulum-yandan.jpg) ·
+[parts and wiring](3d-models/shutter/parcalar.jpg).
 
-> **Not:** Switch kutusu **Artillery Sidewinder X4 Pro** için tasarlandı; başka
-> yazıcılara oturmayabilir. Kendi yazıcınız için internette benzer bir
-> switch/deklanşör tutucusu aratabilirsiniz.
+> **Note:** The switch box was designed for the **Artillery Sidewinder X4 Pro**; it
+> may not fit other printers. You can search online for a similar switch/shutter
+> holder for your own printer.
 
-### Klipper makrosu
+### Klipper macro
 
-Aşağıdaki makrolar `printer.cfg` dosyasına eklenir. Wi-Fi ile tetikleme için
-Klipper'da **G-Code Shell Command** eklentisi kurulu olmalıdır
-([KIAUH](https://github.com/dw-0/kiauh) → Extensions menüsünden kurulabilir).
+Add the macros below to your `printer.cfg`. Triggering over Wi-Fi requires the
+**G-Code Shell Command** extension to be installed in Klipper
+(it can be installed from the Extensions menu of [KIAUH](https://github.com/dw-0/kiauh)).
 
 ```ini
 [gcode_macro TIMELAPSE_ON]
-description: Timelapse aktif
+description: Enable timelapse
 gcode:
   SET_GCODE_VARIABLE MACRO=TIMELAPSE VARIABLE=enabled VALUE=1
-  M117 Timelapse ACIK
+  M117 Timelapse ON
 
 [gcode_macro TIMELAPSE_OFF]
-description: Timelapse kapat
+description: Disable timelapse
 gcode:
   SET_GCODE_VARIABLE MACRO=TIMELAPSE VARIABLE=enabled VALUE=0
-  M117 Timelapse KAPALI
+  M117 Timelapse OFF
 
 [gcode_macro TIMELAPSE]
 variable_enabled: 0
@@ -106,14 +110,14 @@ gcode:
     {% set park_y = params.Y | default(240) | float %}
 
     G91
-    G1 E-{retract} F2100            ; filamenti geri çek
-    G1 Z{z_hop} F600                ; nozzle'ı baskıdan kaldır
+    G1 E-{retract} F2100            ; retract filament
+    G1 Z{z_hop} F600                ; lift the nozzle off the print
     G90
-    G1 X{park_x} Y{park_y} F7000    ; park noktasına git
+    G1 X{park_x} Y{park_y} F7000    ; move to the park position
     M400
-    G4 P300                         ; titreşim dinsin
-    RUN_SHELL_COMMAND CMD=tetikle_kamera
-    G4 P1500                        ; fotoğraf çekilsin
+    G4 P300                         ; let vibrations settle
+    RUN_SHELL_COMMAND CMD=trigger_camera
+    G4 P1500                        ; wait for the photo
     G91
     G1 Z-{z_hop} F600
     M83
@@ -121,251 +125,254 @@ gcode:
     G90
   {% endif %}
 
-[gcode_shell_command tetikle_kamera]
-command: curl http://<TELEFONUN_IP_ADRESI>:5000/foto-cek
+[gcode_shell_command trigger_camera]
+command: curl http://<PHONE_IP_ADDRESS>:5000/foto-cek
 timeout: 6.
 verbose: False
 ```
 
-**Switch ile tetiklemek için** makrodaki `RUN_SHELL_COMMAND CMD=tetikle_kamera`
-satırının yerine kafayı switch'e götürüp geri çeken hareketi yazın. Mesafe,
-switch'in nereye takıldığına göre yazıcıdan yazıcıya değişir:
+**To trigger with the switch**, replace the `RUN_SHELL_COMMAND CMD=trigger_camera`
+line in the macro with a move that takes the head to the switch and back. The
+distance depends on where the switch is mounted and varies from printer to printer:
 
 ```ini
-    G1 X{park_x + 8} F3000          ; switch'e dokun (mesafeyi yazıcınıza göre ayarlayın)
+    G1 X{park_x + 8} F3000          ; press the switch (adjust the distance for your printer)
     G4 P200
-    G1 X{park_x} F3000              ; geri çekil
+    G1 X{park_x} F3000              ; move back
 ```
 
-Kullanmadan önce:
+Before using it:
 
-- Dilimleyicinizde (slicer) her katman değişiminde çalışan G-code alanına `TIMELAPSE`
-  satırını ekleyin. OrcaSlicer'da bu alan **Printer settings → Machine G-code →
-  Timelapse G-code** altındadır:
+- Add a `TIMELAPSE` line to the G-code field in your slicer that runs on every layer
+  change. In OrcaSlicer this field is under **Printer settings → Machine G-code →
+  Timelapse G-code**:
 
-  ![OrcaSlicer'da Timelapse G-code alanına TIMELAPSE yazılması](docs/orca-timelapse-gcode.png)
+  ![Entering TIMELAPSE in OrcaSlicer's Timelapse G-code field](docs/orca-timelapse-gcode.png)
 
-- Makro varsayılan olarak kapalıdır: baskıdan önce `TIMELAPSE_ON` çalıştırın
-  (ya da `PRINT_START` makronuza ekleyin).
-- Park noktasını yazıcınıza göre değiştirebilirsiniz: `TIMELAPSE X=230 Y=230`.
+- The macro is disabled by default: run `TIMELAPSE_ON` before printing
+  (or add it to your `PRINT_START` macro).
+- You can change the park position for your printer: `TIMELAPSE X=230 Y=230`.
 
-### PrintLapse kullanımı
+### Using PrintLapse
 
-1. **Slider'ı hazırlayın.** Web arayüzünde sıfırlama (homing) adımlarını tamamlayın,
-   slider'ı istediğiniz konumlara sürüp **Use as Start** ve **Use as End**
-   butonlarıyla başlangıç ve bitiş noktalarını kaydedin.
-2. **Slider'ın adresini girin.** PrintLapse'te **Ayarlar → Kızak IP Adresi** alanına
-   slider'ın OLED ekranında yazan IP adresini yazın ve **Bağlantıyı Test Et**'e basın.
-   Telefon ve slider aynı Wi-Fi ağında olmalıdır.
-3. **Tetikleyiciyi hazırlayın.** Yazıcıya [Klipper makrosunu](#klipper-makrosu)
-   ekleyin. Wi-Fi ile tetikleyecekseniz uygulamada **Ayarlar → Ağ Tetikleyici**
-   seçeneğini açın.
-4. **Projeyi oluşturun.** Yeni bir proje açın, **Kamera kızağını kullan** seçeneğini
-   açın ve **Toplam Katman** alanına dilimleyicide (slicer) görünen katman sayısını
-   yazın. Ardından **Kamerayı Başlat**'a basın.
-5. **Kontrol edin.** Kamera ekranının üstündeki **KIZAK** kartında bağlantı durumu,
-   slider'ın konumu ve çekilen kare sayısı görünür. **Başa Git** slider'ı başlangıç
-   noktasına götürür; **Önizleme** ise başlangıçtan bitişe bir deneme turu attırır.
-   Kartta turuncu bir uyarı varsa (ör. "Sıfırlama gerekli", "Başlangıç ve bitiş
-   ayarlanmamış") önce onu giderin.
-6. **Baskıyı başlatın.** Her tetikte bir kare çekilir ve slider bir sonraki konuma
-   geçer. Toplam katman sayısına ulaşıldığında uygulama sizi bilgilendirir.
+1. **Prepare the slider.** Complete the homing steps in the web interface, drive the
+   slider to the positions you want, and save the start and end points with the
+   **Use as Start** and **Use as End** buttons.
+2. **Enter the slider's address.** In PrintLapse, type the IP address shown on the
+   slider's OLED display into **Settings → Slider IP Address** and tap
+   **Test Connection**. The phone and the slider must be on the same Wi-Fi network.
+3. **Set up the trigger.** Add the [Klipper macro](#klipper-macro) to your printer.
+   If you trigger over Wi-Fi, enable **Settings → Network Trigger** in the app.
+4. **Create the project.** Open a new project, enable **Use camera slider**, and enter
+   the layer count shown in your slicer into the **Total Layers** field. Then tap
+   **Start Camera**.
+5. **Check.** The **SLIDER** card at the top of the camera screen shows the connection
+   status, the slider position and the number of frames taken. **Go to Start** moves
+   the slider to the start point; **Preview** does a test run from start to end.
+   If the card shows an orange warning (e.g. "Homing required", "Start and end not
+   set"), resolve it first.
+6. **Start the print.** One frame is taken per trigger and the slider moves to the
+   next position. The app lets you know when the total layer count is reached.
 
-Bağlantı sorunları yaşarsanız [Sorun giderme](#sorun-giderme) bölümüne bakın.
+If you run into connection problems, see the [Troubleshooting](#troubleshooting) section.
 
-## Donanım
+## Hardware
 
-| Parça | Açıklama |
+| Part | Description |
 |---|---|
-| ESP32-C3 0.42" OLED SuperMini | Ana kontrolcü (dahili SSD1306 72×40 OLED) |
-| 2× A4988 | Step motor sürücüleri (1/16 mikro adım) |
-| 2× NEMA 17 | 1.8°/adım; biri lineer eksen, biri pan |
-| AMS1117 5V regülatör modülü | 12V → 5V (ESP32 beslemesi) |
-| Lever limit switch (JL012-13.5-2) | Lineer eksen sıfır noktası |
-| 12V adaptör + barrel jack | Motor beslemesi |
+| ESP32-C3 0.42" OLED SuperMini | Main controller (built-in SSD1306 72×40 OLED) |
+| 2× A4988 | Stepper motor drivers (1/16 microstepping) |
+| 2× NEMA 17 | 1.8°/step; one for the linear axis, one for pan |
+| AMS1117 5V regulator module | 12V → 5V (ESP32 supply) |
+| Lever limit switch (JL012-13.5-2) | Linear axis home position |
+| 12V adapter + barrel jack | Motor supply |
 
-### Mekanik / bağlantı malzemeleri
+### Mechanical / fastening parts
 
-| Parça | Adet | Not |
+| Part | Qty | Note |
 |---|---|---|
-| 20 × 40 mm sigma profil, 300 mm | 1 | Slider gövdesi |
-| 8 mm çap, 300 mm lineer mil | 2 | Araba kızağı |
-| LM8UU lineer rulman | 2 | 8 mm mil için |
-| M3 × 10 mm cıvata | 17 | Genel montaj |
-| M3 × 25 mm cıvata | 2 | — |
-| M3 somun | 4 | — |
-| M3 insert somun (ısıyla gömme) | 7 | 3D baskı parçalara gömülür |
-| M5 × 25 mm cıvata | 1 | Telefon tutucu bağlantısı |
-| M5 somun | 1 | Telefon tutucu bağlantısı |
-| 30 × 70 mm delikli pertinaks | 1 | Sürücü/kablo bağlantı kartı |
+| 20 × 40 mm aluminium extrusion, 300 mm | 1 | Slider body |
+| 8 mm diameter, 300 mm linear rod | 2 | Carriage rails |
+| LM8UU linear bearing | 2 | For the 8 mm rods |
+| M3 × 10 mm bolt | 17 | General assembly |
+| M3 × 25 mm bolt | 2 | — |
+| M3 nut | 4 | — |
+| M3 heat-set insert | 7 | Pressed into the 3D printed parts |
+| M5 × 25 mm bolt | 1 | Phone holder mount |
+| M5 nut | 1 | Phone holder mount |
+| 30 × 70 mm perfboard | 1 | Driver/wiring board |
 
-## Bağlantı şeması
+## Wiring diagram
 
-![Bağlantı şeması](docs/baglanti-semasi.png)
+![Wiring diagram](docs/baglanti-semasi.png)
 
-Yüksek çözünürlüklü PDF: [docs/baglanti-semasi.pdf](docs/baglanti-semasi.pdf)
+High-resolution PDF: [docs/baglanti-semasi.pdf](docs/baglanti-semasi.pdf)
 
-### Pin haritası
+### Pin map
 
-| ESP32-C3 pini | Nereye gidiyor | Not |
+| ESP32-C3 pin | Connects to | Note |
 |---|---|---|
-| GPIO0 | A4988 #1 — STEP | Lineer eksen adım sinyali |
-| GPIO1 | A4988 #1 — DIR | Lineer eksen yön |
-| GPIO3 | A4988 #1 — ENABLE | Aktif LOW (LOW = sürücü etkin) |
-| GPIO4 | Limit switch → GND | `INPUT_PULLUP`; basılınca LOW |
-| GPIO7 | A4988 #2 — STEP | Pan ekseni adım sinyali |
-| GPIO10 | A4988 #2 — DIR | Pan ekseni yön |
-| GPIO20 | A4988 #2 — ENABLE | UART0-TX pini; Serial USB-CDC'de olduğundan serbest |
-| GPIO21 | Pan limit switch (rezerve) | Bağlı değil, `PAN_HAS_LIMIT=0` |
-| GPIO5 / GPIO6 | Dahili OLED SDA / SCL | Kart üzerinde sabit; I²C `0x3C` |
-| 5V | AMS1117 çıkışı | ESP32 beslemesi (USB takılıyken gerekmez) |
-| 3V3 | Her iki A4988 — VDD | Sürücü lojik beslemesi |
-| GND | Ortak toprak | ESP + sürücüler + 12V kaynak + limit switch |
+| GPIO0 | A4988 #1 — STEP | Linear axis step signal |
+| GPIO1 | A4988 #1 — DIR | Linear axis direction |
+| GPIO3 | A4988 #1 — ENABLE | Active LOW (LOW = driver enabled) |
+| GPIO4 | Limit switch → GND | `INPUT_PULLUP`; LOW when pressed |
+| GPIO7 | A4988 #2 — STEP | Pan axis step signal |
+| GPIO10 | A4988 #2 — DIR | Pan axis direction |
+| GPIO20 | A4988 #2 — ENABLE | UART0-TX pin; free because Serial runs over USB-CDC |
+| GPIO21 | Pan limit switch (reserved) | Not connected, `PAN_HAS_LIMIT=0` |
+| GPIO5 / GPIO6 | Built-in OLED SDA / SCL | Fixed on the board; I²C `0x3C` |
+| 5V | AMS1117 output | ESP32 supply (not needed while USB is plugged in) |
+| 3V3 | Both A4988 — VDD | Driver logic supply |
+| GND | Common ground | ESP + drivers + 12V supply + limit switch |
 
-**A4988 kurulumu:** RESET ↔ SLEEP köprülü; MS1 = MS2 = MS3 = HIGH → 1/16 mikro adım
-(koddaki `DRIVER_MICROSTEP 16` ile eşleşmeli); her sürücünün VMOT–GND arasına
-100 µF kondansatör. Akım limiti Vref potuyla ayarlanır.
+**A4988 setup:** RESET ↔ SLEEP bridged; MS1 = MS2 = MS3 = HIGH → 1/16 microstepping
+(must match `DRIVER_MICROSTEP 16` in the code); a 100 µF capacitor across VMOT–GND
+of each driver. The current limit is set with the Vref potentiometer.
 
-**Kaçınılacak pinler:** GPIO2, GPIO8, GPIO9 (strapping/BOOT), GPIO18/19 (USB D−/D+), GPIO11–17 (flash).
+**Pins to avoid:** GPIO2, GPIO8, GPIO9 (strapping/BOOT), GPIO18/19 (USB D−/D+), GPIO11–17 (flash).
 
-## Montaj bilgileri
+## Assembly
 
-![Slider montajı: parçaların patlatılmış görünümü](docs/slider-montaj.gif)
+![Slider assembly: exploded view of the parts](docs/slider-montaj.gif)
 
 <img width="1466" height="2074" alt="png 1" src="https://github.com/user-attachments/assets/6fcbd022-65e0-4f87-8ea6-d9b08254046a" />
 
 <img width="1465" height="2074" alt="png 2" src="https://github.com/user-attachments/assets/5dc0f62a-4d5b-467c-b50d-c03cbb236b7f" />
 
 
-### 3D baskı parçaları
+### 3D printed parts
 
-Basılması gereken tüm parçaların STL dosyaları [`3d-models/`](3d-models/)
-klasöründe:
+STL files for all parts that need to be printed are in the
+[`3d-models/`](3d-models/) folder:
 
 ```
 3d-models/
-├── slider/           Projeye özel parçalar (motor yatakları, araba, kayış tutucu vb.)
-├── shutter/          Yazıcı kafasının bastığı switch kutusu (PrintLapse tetikleyicisi)
-└── telefon-tutucu/   Telefon tutucu modülleri (harici tasarım — aşağıya bakın)
+├── slider/           Project-specific parts (motor mounts, carriage, belt holder, etc.)
+├── shutter/          Switch box pressed by the printer head (PrintLapse trigger)
+└── telefon-tutucu/   Phone holder modules (third-party design — see below)
 ```
 
-Önerilen baskı ayarları ve parça listesi için [`3d-models/README.md`](3d-models/README.md)
-dosyasına bakın.
+See [`3d-models/README.md`](3d-models/README.md) for recommended print settings and
+the parts list.
 
-#### Telefon tutucu — atıf
+#### Phone holder — attribution
 
-`3d-models/telefon-tutucu/` içindeki modeller bana ait değil:
-[HeyVye](https://www.thingiverse.com/thing:2194278) tarafından tasarlanan
-**Modular Mounting System** projesinden, Creative Commons Attribution (CC BY)
-lisansıyla. Kullanıcı ayrıca aramak zorunda kalmasın diye repoya ekledim.
-Bu kısmın montajı için orijinal sayfadaki talimatları izleyin — modüller M5
-cıvata/somun ile birleşir, bağlantı noktası GoPro uyumludur.
+The models in `3d-models/telefon-tutucu/` are not mine: they come from the
+**Modular Mounting System** project designed by
+[HeyVye](https://www.thingiverse.com/thing:2194278), licensed under Creative Commons
+Attribution (CC BY). I included them in the repo so users don't have to look for them
+separately. Follow the instructions on the original page to assemble this part — the
+modules join with M5 bolts/nuts, and the mount is GoPro-compatible.
 
-## Mekanik / kalibrasyon varsayılanları
+## Mechanical / calibration defaults
 
-- Lineer: 200 adım/tur × 16 mikro adım = 3200 adım/tur; GT2 20T kasnak (40 mm/tur) → **80 adım/mm**
-- Pan: direkt tahrik, 3200 adım = 360°
-- Maks. yol 300 mm, maks. hız 50 mm/s — hepsi web arayüzünden değiştirilebilir ve kalıcı saklanır
+- Linear: 200 steps/rev × 16 microsteps = 3200 steps/rev; GT2 20T pulley (40 mm/rev) → **80 steps/mm**
+- Pan: direct drive, 3200 steps = 360°
+- Max. travel 300 mm, max. speed 50 mm/s — all can be changed from the web interface and are stored persistently
 
-## Derleme ve yükleme
+## Building and uploading
 
-Proje [PlatformIO](https://platformio.org/) ile derlenir:
+The project is built with [PlatformIO](https://platformio.org/):
 
 ```
 pio run -t upload          # firmware
-pio run -t uploadfs        # web arayüzü (data/ → LittleFS)
+pio run -t uploadfs        # web interface (data/ → LittleFS)
 ```
 
-İkisini de yükledikten sonra cihaz açılışta hotspot'unu açar — devamı için
-[İlk kullanım](#ilk-kullanım) bölümüne bakın.
+After uploading both, the device opens its hotspot on boot — see
+[First use](#first-use) for what comes next.
 
-## Sorun giderme
+## Troubleshooting
 
-### Slider beklendiği gibi çalışmıyorsa: önce Wi-Fi mesafesine bakın
+### If the slider isn't working as expected: check the Wi-Fi distance first
 
-Uygulamada sık sık **"Bağlı değil"** görmek, komutların gecikmesi, kareler arasında
-slider'ın hareket etmemesi ya da açılışta ev ağına bağlanamayıp hotspot moduna
-düşmesi gibi sorunların büyük çoğunluğunun sebebi **slider'ın modemden uzakta
-olmasıdır.**
+Most problems — frequently seeing **"Not connected"** in the app, delayed commands,
+the slider not moving between frames, or failing to join the home network on boot
+and falling back to hotspot mode — are caused by **the slider being too far from
+the router.**
 
-ESP32-C3 SuperMini kartı, kartın üzerine lehimli küçük bir **SMD (seramik) anten**
-kullanır. Harici anten konnektörlü ya da daha büyük PCB antenli ESP32 modellerine
-göre hem yayın hem de alış gücü belirgin şekilde düşüktür. Telefonunuzun aynı
-noktada rahatça bağlandığı bir ağ, slider için sınırda olabilir.
+The ESP32-C3 SuperMini board uses a small **SMD (ceramic) antenna** soldered onto
+the board. Both its transmit and receive performance are noticeably weaker than
+ESP32 models with an external antenna connector or a larger PCB antenna. A network
+your phone connects to comfortably from the same spot may be borderline for the slider.
 
-Yapabilecekleriniz (etkisi büyükten küçüğe):
+What you can do (largest effect first):
 
-- **Slider'ı modeme yaklaştırın** ya da aradaki duvar sayısını azaltın. Mümkünse
-  modemle aynı odada kullanın; olmuyorsa araya bir Wi-Fi genişletici / mesh noktası koyun.
-- **Antenin etrafını boş bırakın.** Antenin 1–1,5 cm çevresinde metal olmasın:
-  alüminyum profil, motor kabloları ve kablo demeti anteni "söndürür" (20 dB kayıp
-  sıradandır). Kutu içinde antenin metal parçalara değil, plastik duvara bakmasını sağlayın.
-- **Motor kablolarını** ikişerli burgu yapın ve antenden uzak geçirin.
-- **Beslemeyi güçlendirin.** Wi-Fi yayını sırasında kart anlık olarak yüksek akım
-  çeker; 3,3 V hattı çökerse sinyal bozulur. ESP kartının hemen yanına
-  470–1000 µF + 100 nF kondansatör koyun, her A4988'in VMOT girişine yakın 100 µF
-  ekleyin ve motor topraklamasının ESP'nin toprağı üzerinden dönmemesine dikkat edin.
+- **Move the slider closer to the router**, or reduce the number of walls in between.
+  Use it in the same room as the router if possible; if not, add a Wi-Fi extender / mesh node.
+- **Keep the area around the antenna clear.** There should be no metal within
+  1–1.5 cm of the antenna: aluminium extrusion, motor cables and wire bundles "kill"
+  the antenna (20 dB of loss is common). Inside an enclosure, make sure the antenna
+  faces a plastic wall rather than metal parts.
+- **Twist motor cables** in pairs and route them away from the antenna.
+- **Strengthen the power supply.** The board draws high current bursts while
+  transmitting over Wi-Fi; if the 3.3 V rail sags, the signal degrades. Place a
+  470–1000 µF + 100 nF capacitor right next to the ESP board, add 100 µF close to
+  each A4988's VMOT input, and make sure the motor ground does not return through
+  the ESP's ground.
 
-**Sinyal gücünü ölçmek için** kartı USB ile bilgisayara bağlayıp seri monitörü açın
-(`pio device monitor`, 115200 baud). Kart ağa bağlandığında şöyle bir satır yazar:
+**To measure signal strength**, connect the board to a computer over USB and open
+the serial monitor (`pio device monitor`, 115200 baud). When the board joins the
+network it prints a line like this:
 
 ```
-[wifi] connected to EvAgim  RSSI -58 dBm  IP 192.168.1.110
+[wifi] connected to MyHomeWiFi  RSSI -58 dBm  IP 192.168.1.110
 ```
 
-| RSSI | Anlamı |
+| RSSI | Meaning |
 |---|---|
-| -30 … -60 dBm | İyi |
-| -60 … -70 dBm | Kullanılabilir, ara sıra kopma olabilir |
-| -70 dBm'den kötü | Zayıf — kopmalar ve açılışta bağlanamama beklenir |
+| -30 … -60 dBm | Good |
+| -60 … -70 dBm | Usable, occasional drops possible |
+| Worse than -70 dBm | Weak — expect drops and failure to connect on boot |
 
-Zayıf sinyalde seri monitörde `[wifi] attempt 2 failed: AUTH_FAIL` ya da
-`[wifi] link lost` satırları da görülür. Şifre doğru olsa bile ESP32 zayıf
-sinyalde `AUTH_FAIL` bildirebilir.
+With a weak signal you will also see `[wifi] attempt 2 failed: AUTH_FAIL` or
+`[wifi] link lost` lines in the serial monitor. The ESP32 can report `AUTH_FAIL`
+on a weak signal even when the password is correct.
 
-### Açılışta ev ağına bağlanamıyor
+### Can't join the home network on boot
 
-- Açılışta OLED'de **"Connecting"** ve altında büyük bir **deneme sayısı** görünür.
-  Kart, kayıtlı ağa yaklaşık 22 saniye boyunca tekrar tekrar bağlanmayı dener.
-- Bağlanamazsa hotspot moduna geçer ve OLED'de **"AP MODE"**, ağ adı (`CameraSlider`)
-  ve şifre (`12345678`) yazar.
-- Hotspot'a kimse bağlı değilken kart, dakikada bir ev ağını sessizce tekrar dener.
-  Modem geç açıldıysa ya da ilk deneme şanssız geçtiyse **reset'e basmadan**
-  kendiliğinden bağlanır.
-- Her seferinde "AP MODE"a düşüyorsa ya şifre yanlıştır (hotspot'a bağlanıp tekrar
-  girin) ya da sinyal zayıftır (yukarıdaki bölüm).
+- On boot the OLED shows **"Connecting"** with a large **attempt number** below it.
+  The board keeps retrying the saved network for about 22 seconds.
+- If it can't connect, it switches to hotspot mode and the OLED shows **"AP MODE"**,
+  the network name (`CameraSlider`) and the password (`12345678`).
+- While no one is connected to the hotspot, the board quietly retries the home
+  network once a minute. If the router came up late or the first attempt was
+  unlucky, it connects on its own **without pressing reset**.
+- If it falls back to "AP MODE" every time, either the password is wrong (connect to
+  the hotspot and enter it again) or the signal is weak (see the section above).
 
-### Kurulum sayfası kendiliğinden açılmıyor
+### The setup page doesn't open on its own
 
-- Tarayıcıya elle **`http://192.168.4.1`** yazın (başındaki `http://` önemli).
-- Bazı telefonlar, internet erişimi olmayan bu ağı "internet yok" diye bırakıp mobil
-  veriye döner. Telefonun sorduğu "bu ağda kal / bağlı kal" seçeneğini onaylayın ya
-  da kurulum süresince mobil veriyi kapatın.
+- Type **`http://192.168.4.1`** into your browser (the leading `http://` matters).
+- Some phones drop this network because it has no internet access and switch back to
+  mobile data. Confirm the phone's "stay on this network / stay connected" prompt, or
+  turn off mobile data during setup.
 
-### Uygulamada "Başlangıç ve bitiş ayarlanmamış" yazıyor
+### The app says "Start and end not set"
 
-Slider'a hiç başlangıç/bitiş noktası kaydedilmemiş demektir. Web arayüzünde
-slider'ı istediğiniz konuma sürüp **Use as Start** ve **Use as End** butonlarına
-basın. Kaydedilmemiş olan buton turuncu görünür. Firmware güncellemesinden önce
-açılmış bir tarayıcı sekmesi kullanıyorsanız önce sayfayı yenileyin.
+No start/end point has been saved on the slider yet. In the web interface, drive the
+slider to the position you want and press the **Use as Start** and **Use as End**
+buttons. A button that hasn't been saved yet is shown in orange. If you are using a
+browser tab opened before a firmware update, reload the page first.
 
-## Proje yapısı
+## Project structure
 
 ```
-src/            Firmware kaynak kodu (Config.h: tüm pin ve varsayılan ayarlar)
-data/           Web arayüzü (LittleFS'e yüklenir)
-docs/           Bağlantı şeması (PNG + PDF, Fritzing çizimi)
-3d-models/      Basılacak parçaların STL dosyaları
-platformio.ini  Derleme yapılandırması
+src/            Firmware source code (Config.h: all pins and default settings)
+data/           Web interface (uploaded to LittleFS)
+docs/           Wiring diagram (PNG + PDF, Fritzing drawing)
+3d-models/      STL files for the printed parts
+platformio.ini  Build configuration
 ```
 
-## Lisans
+## License
 
-Bu projenin kaynak kodu ve tasarım dosyaları MIT lisansı altındadır — bkz.
-[LICENSE](LICENSE). `3d-models/telefon-tutucu/` klasörü istisnadır; o parçalar
-üçüncü tarafa ait olup CC BY lisansıyla dağıtılır (yukarıdaki atfa bakın).
+The source code and design files of this project are licensed under the MIT
+License — see [LICENSE](LICENSE). The `3d-models/telefon-tutucu/` folder is an
+exception; those parts belong to a third party and are distributed under CC BY
+(see the attribution above).
 
-## Teşekkür
+## Acknowledgements
 
-- Telefon tutucu modülleri: **Modular Mounting System** — [HeyVye](https://www.thingiverse.com/thing:2194278) (CC BY)
-- Adım üretimi: [FastAccelStepper](https://github.com/gin66/FastAccelStepper) — gin66
+- Phone holder modules: **Modular Mounting System** — [HeyVye](https://www.thingiverse.com/thing:2194278) (CC BY)
+- Step generation: [FastAccelStepper](https://github.com/gin66/FastAccelStepper) — gin66
